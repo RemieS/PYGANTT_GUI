@@ -37,4 +37,4 @@ Dependencies:
 ## Install from GitHub
 
 ```bash
-pip install git+https://github.com/YOURUSERNAME/pygantt.git
+pip install git+https://github.com/RemieS/PYGANTT_GUI.git
