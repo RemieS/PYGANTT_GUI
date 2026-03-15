@@ -38,3 +38,14 @@ Dependencies:
 
 ```bash
 pip install git+https://github.com/RemieS/PYGANTT_GUI.git
+
+#Upgrade
+
+```bash
+pip install --upgrade git+https://github.com/RemieS/PYGANTT_GUI.git
+
+#Launch *(while in terminal)*
+
+```bash
+pyganttgui
+
