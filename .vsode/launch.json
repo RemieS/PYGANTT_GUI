@@ -1,0 +1,14 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run PyGantt GUI",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/pyganttgui.py",
+      "console": "integratedTerminal",
+      "python": "C:\\Coding\\Python\\PyGantt_GUI\\.venv\\Scripts\\python.exe",
+      "cwd": "${workspaceFolder}"
+    }
+  ]
+}

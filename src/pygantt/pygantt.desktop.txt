@@ -1,0 +1,9 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=PyGantt
+Comment=Retro Gantt chart tool
+Exec=pygantt
+Icon=pygantt
+Terminal=true
+Categories=Utility;Office;
