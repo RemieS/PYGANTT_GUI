@@ -1,7 +1,4 @@
 from datetime import datetime, timedelta
-from logging import root
-from platform import node
-
 
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical, Container, ScrollableContainer
@@ -29,7 +26,6 @@ from .data import (
     delete_task,
 )
 
-# PUT THIS HERE
 THEMES = {
     "retro_neon": {
         "banner": "#ff3df5",
@@ -62,6 +58,7 @@ THEMES = {
         "text": "white",
     },
 }
+
 
 class Banner(Static):
     def on_mount(self) -> None:
@@ -98,206 +95,6 @@ class TaskDetails(Static):
             f"End: {task['end'].strftime('%Y-%m-%d')}"
         )
 
-
-from datetime import datetime, timedelta
-from textual.widgets import Static
-import calendar
-
-
-class GanttView(Static):
-    CELL_WIDTH = 3
-    GLOSSARY_WIDTH = 6
-
-    def _cell(self, text: str, *, weekend: bool = False, style: str = "") -> str:
-        text = str(text)
-        text = f"{text:^{self.CELL_WIDTH}}"[:self.CELL_WIDTH]
-
-        styles = []
-        if weekend:
-            styles.append("dim")
-        if style:
-            styles.append(style)
-
-        if styles:
-            return f"[{' '.join(styles)}]{text}[/]"
-        return text
-
-    def _left_prefix(self, glossary: str, row_label: str, row_label_width: int) -> str:
-        return f"{glossary:<{self.GLOSSARY_WIDTH}} {row_label:<{row_label_width}} │"
-
-    def _separator_row(self, row_label_width: int, total_days: int) -> str:
-        return (
-            " " * self.GLOSSARY_WIDTH
-            + " "
-            + "─" * row_label_width
-            + "─┼"
-            + "┼".join("─" * self.CELL_WIDTH for _ in range(total_days))
-            + "┼"
-        )
-
-    def _month_bounds(self, date_value):
-        first_day = date_value.replace(day=1)
-        last_day_num = calendar.monthrange(date_value.year, date_value.month)[1]
-        last_day = date_value.replace(day=last_day_num)
-        return first_day, last_day
-
-    def _grouped_row(
-        self,
-        label: str,
-        values: list[str],
-        days: list,
-        today,
-        row_label_width: int,
-    ) -> str:
-        row = self._left_prefix(label, "", row_label_width)
-        previous = None
-
-        for value, day in zip(values, days):
-            weekend = day.weekday() >= 5
-            is_today = day == today
-            style = "reverse" if is_today else ""
-
-            shown = value if value != previous else ""
-            row += self._cell(shown, weekend=weekend, style=style) + "│"
-            previous = value
-
-        return row
-
-    def _plain_row(
-        self,
-        label: str,
-        values: list[str],
-        days: list,
-        today,
-        row_label_width: int,
-    ) -> str:
-        row = self._left_prefix(label, "", row_label_width)
-
-        for value, day in zip(values, days):
-            weekend = day.weekday() >= 5
-            is_today = day == today
-            style = "reverse" if is_today else ""
-            row += self._cell(value, weekend=weekend, style=style) + "│"
-
-        return row
-
-    def show_tasks(
-        self,
-        selected_projects: list[str],
-        projects: dict[str, list[dict]],
-        start_date,
-        end_date,
-    ) -> None:
-        
-        if not selected_projects:
-            self.update("No project selected.")
-            return
-
-        rows: list[dict] = []
-        for project_name in selected_projects:
-            for task in projects.get(project_name, []):
-                rows.append(
-                    {
-                        "project": project_name,
-                        "task": task["task"],
-                        "assignee": task["assignee"],
-                        "start": task["start"].date(),
-                        "end": task["end"].date(),
-                    }
-                )
-
-        today = datetime.now().date()
-
-        total_days = (end_date - start_date).days + 1
-        days = [start_date + timedelta(days=i) for i in range(total_days)]
-
-        if rows:
-            row_labels = [f"{row['project']} / {row['task']}" for row in rows]
-            row_label_width = max(24, max(len(label) for label in row_labels))
-        else:
-            row_labels = []
-            row_label_width = 24
-
-        year_values = [f"{day.year % 100:02d}" for day in days]
-        month_values = [day.strftime("%b") for day in days]
-        week_values = [f"W{day.isocalendar().week:02d}" for day in days]
-        date_values = [f"{day.day:02d}" for day in days]
-        day_values = [day.strftime("%a")[:2] for day in days]
-
-        separator = self._separator_row(row_label_width, total_days)
-
-        month_title = start_date.strftime("%B %Y")
-
-        lines = [
-            f"[b]Projects:[/b] {', '.join(selected_projects) if selected_projects else 'None'}",
-            f"[b]Visible month:[/b] {month_title}",
-            "",
-            self._grouped_row("Year", year_values, days, today, row_label_width),
-            self._grouped_row("Month", month_values, days, today, row_label_width),
-            self._grouped_row("Week", week_values, days, today, row_label_width),
-            self._plain_row("Date", date_values, days, today, row_label_width),
-            self._plain_row("Day", day_values, days, today, row_label_width),
-            separator,
-        ]
-
-        if not rows:
-            gantt_row = self._left_prefix("", "No tasks planned", row_label_width)
-
-            for day in days:
-                weekend = day.weekday() >= 5
-                is_today = day == today
-
-                if weekend and is_today:
-                    cell = self._cell("░", style="reverse dim")
-                elif weekend:
-                    cell = self._cell("░", weekend=True)
-                elif is_today:
-                    cell = self._cell(" ", style="reverse")
-                else:
-                    cell = self._cell(" ")
-
-                gantt_row += cell + "│"
-
-            lines.append(gantt_row)
-            lines.append(separator)
-
-        else:
-            for row, label in zip(rows, row_labels):
-                gantt_row = self._left_prefix("", label, row_label_width)
-
-                theme = self.app.theme_data
-
-                for day in days:
-                    weekend = day.weekday() >= 5
-                    in_task = row["start"] <= day <= row["end"]
-                    is_today = day == today
-
-                    if in_task and weekend and is_today:
-                        cell = self._cell("█", style=f"reverse bold {theme['task_bar_today']}")
-                    elif in_task and is_today:
-                        cell = self._cell("█", style=f"reverse bold {theme['task_bar_today']}")
-                    elif in_task and weekend:
-                        cell = self._cell("█", style=f"bold {theme['task_bar']}")
-                    elif in_task:
-                        cell = self._cell("█", style=f"bold {theme['task_bar']}")
-                    elif weekend and is_today:
-                        cell = self._cell("░", style="reverse dim")
-                    elif weekend:
-                        cell = self._cell("░", weekend=True)
-                    elif is_today:
-                        cell = self._cell(" ", style="reverse")
-                    else:
-                        cell = self._cell(" ")
-
-                    gantt_row += cell + "│"
-
-                lines.append(gantt_row)
-                lines.append(separator)
-
-        lines.append("")
-        lines.append("[dim]Full months are shown. Grouped headers reduce repetition. Weekends are dimmed.[/dim]")
-
-        self.update("\n".join(lines))
 
 class ConfirmScreen(ModalScreen[bool]):
     CSS = """
@@ -341,9 +138,6 @@ class ConfirmScreen(ModalScreen[bool]):
         super().__init__()
         self.title = title
         self.message = message
-        self.selected_projects: set[str] = set()
-        self.multi_select_mode = True
-        self.gantt_month_offset = 0
 
     def compose(self) -> ComposeResult:
         with Container(id="dialog"):
@@ -541,15 +335,9 @@ class TaskEditorScreen(ModalScreen[dict | None]):
 class PyGanttApp(App):
     CSS = """
     Screen {
-        layout: vertical; 
+        layout: vertical;
     }
-    
-    #banner-scroll {
-        height: 10;
-        overflow-x: auto;
-        overflow-y: auto;
-        border: round yellow;
-    }
+
     #banner {
         height: auto;
         padding: 1 2;
@@ -590,17 +378,34 @@ class PyGanttApp(App):
         padding: 1;
     }
 
-    #gantt-scroll {
-        overflow-x: auto;
-        overflow-y: auto;
-        border: solid white;
+    #gantt-wrapper {
+        height: 1fr;
     }
 
-    #gantt {
+    #gantt-labels-scroll {
+        width: 32;
+        overflow-x: hidden;
+        overflow-y: auto;
+        border: solid cyan;
+    }
+
+    #gantt-timeline-scroll {
+        width: 1fr;
+        overflow-x: auto;
+        overflow-y: auto;
+        border: solid cyan;
+    }
+
+    #gantt-labels {
+        width: 32;
+        padding: 1;
+    }
+
+    #gantt-timeline {
         width: auto;
         height: auto;
         padding: 1;
-    }       
+    }
     """
 
     BINDINGS = [
@@ -644,8 +449,12 @@ class PyGanttApp(App):
                             yield TaskDetails("No task selected.", id="details")
 
                     with TabPane("Gantt", id="gantt-tab"):
-                        with ScrollableContainer(id="gantt-scroll"):
-                            yield GanttView("No project selected.", id="gantt")
+                        with Horizontal(id="gantt-wrapper"):
+                            with ScrollableContainer(id="gantt-labels-scroll"):
+                                yield Static(id="gantt-labels")
+
+                            with ScrollableContainer(id="gantt-timeline-scroll"):
+                                yield Static(id="gantt-timeline")
 
         yield Footer()
 
@@ -653,10 +462,14 @@ class PyGanttApp(App):
         table = self.query_one("#tasks", DataTable)
         table.cursor_type = "row"
         table.add_columns("Task", "Assignee", "Start", "End")
+
+        table.styles.color = "white"
+        table.styles.background = "#111111"
+
         self.refresh_project_tree()
         self.apply_theme()
         self.refresh_gantt_view()
-    
+
     def apply_theme(self) -> None:
         theme = self.theme_data
 
@@ -664,7 +477,8 @@ class PyGanttApp(App):
         self.query_one("#projects").styles.border = ("solid", theme["border_primary"])
         self.query_one("#tasks").styles.border = ("solid", theme["border_task"])
         self.query_one("#details").styles.border = ("solid", theme["border_secondary"])
-        self.query_one("#gantt-scroll").styles.border = ("solid", theme["border_primary"])
+        self.query_one("#gantt-labels-scroll").styles.border = ("solid", theme["border_primary"])
+        self.query_one("#gantt-timeline-scroll").styles.border = ("solid", theme["border_primary"])
 
         self.query_one("#banner", Banner).refresh_banner()
         self.refresh_gantt_view()
@@ -680,36 +494,12 @@ class PyGanttApp(App):
 
         root.expand()
 
-
-    def action_toggle_project_selection(self) -> None:
-        tree = self.query_one("#projects", Tree)
-        node = tree.cursor_node
-
-        if node is None:
-            return
-
-        project_name = node.data or str(node.label)
-
-        if project_name not in self.projects:
-            return
-
-        if project_name in self.selected_projects:
-            self.selected_projects.remove(project_name)
-            self.notify(f"Removed '{project_name}' from Gantt selection.")
-        else:
-            self.selected_projects.add(project_name)
-            self.notify(f"Added '{project_name}' to Gantt selection.")
-
-        self.refresh_project_tree()
-        self.refresh_gantt_view() 
-
     def refresh_task_table(self) -> None:
         table = self.query_one("#tasks", DataTable)
         table.clear()
 
-        if not self.selected_project or self.selected_project not in self.projects:
+        if not self.selected_project:
             self.query_one("#details", TaskDetails).show_task(None)
-            self.refresh_gantt_view()
             return
 
         for task in self.projects[self.selected_project]:
@@ -724,14 +514,131 @@ class PyGanttApp(App):
         self.refresh_gantt_view()
 
     def refresh_gantt_view(self) -> None:
-        gantt = self.query_one("#gantt", GanttView)
+        labels = self.query_one("#gantt-labels", Static)
+        timeline = self.query_one("#gantt-timeline", Static)
 
-        selected = sorted(self.selected_projects) if self.selected_projects else (
-            [self.selected_project] if self.selected_project else []
+        selected = (
+            sorted(self.selected_projects)
+            if self.selected_projects
+            else ([self.selected_project] if self.selected_project else [])
         )
 
         start_date, end_date = self.get_gantt_visible_range()
-        gantt.show_tasks(selected, self.projects, start_date, end_date)
+
+        left_lines, right_lines = self.build_gantt_lines(
+            selected,
+            self.projects,
+            start_date,
+            end_date,
+        )
+
+        labels.update("\n".join(left_lines))
+        timeline.update("\n".join(right_lines))
+
+    def build_gantt_lines(
+        self,
+        selected_projects: list[str],
+        projects: dict[str, list[dict]],
+        start_date,
+        end_date,
+    ) -> tuple[list[str], list[str]]:
+        today = datetime.now().date()
+
+        total_days = (end_date - start_date).days + 1
+        days = [start_date + timedelta(days=i) for i in range(total_days)]
+
+        rows = []
+        for project_name in selected_projects:
+            for task in projects.get(project_name, []):
+                rows.append(
+                    {
+                        "project": project_name,
+                        "task": task["task"],
+                        "assignee": task["assignee"],
+                        "start": task["start"].date(),
+                        "end": task["end"].date(),
+                    }
+                )
+
+        row_labels = [f"{row['project']} / {row['task']}" for row in rows] if rows else []
+
+        year_values = [f"{day.year % 100:02d}" for day in days]
+        month_values = [day.strftime("%b") for day in days]
+        week_values = [f"W{day.isocalendar().week:02d}" for day in days]
+        date_values = [f"{day.day:02d}" for day in days]
+        day_values = [day.strftime("%a")[:2] for day in days]
+
+        left_lines: list[str] = []
+        right_lines: list[str] = []
+
+        def grouped(values: list[str]) -> str:
+            previous = None
+            row = []
+            for value in values:
+                shown = value if value != previous else ""
+                row.append(f"{shown:^3}")
+                previous = value
+            return "│".join(row)
+
+        def plain(values: list[str]) -> str:
+            return "│".join(f"{v:^3}" for v in values)
+
+        left_lines.append("Year")
+        right_lines.append(grouped(year_values))
+
+        left_lines.append("Month")
+        right_lines.append(grouped(month_values))
+
+        left_lines.append("Week")
+        right_lines.append(grouped(week_values))
+
+        left_lines.append("Date")
+        right_lines.append(plain(date_values))
+
+        left_lines.append("Day")
+        right_lines.append(plain(day_values))
+
+        left_lines.append("─" * 24)
+        right_lines.append("─" * (4 * total_days))
+
+        theme = self.theme_data
+
+        if not rows:
+            left_lines.append("No tasks planned")
+            empty_cells = []
+            for day in days:
+                if day == today:
+                    empty_cells.append("[reverse] [/]")  # highlight today
+                elif day.weekday() >= 5:
+                    empty_cells.append("░")
+                else:
+                    empty_cells.append(" ")
+            right_lines.append("│".join(f"{c:^3}" for c in empty_cells))
+            return left_lines, right_lines
+
+        for row, label in zip(rows, row_labels):
+            left_lines.append(label)
+            cells = []
+
+            for day in days:
+                weekend = day.weekday() >= 5
+                in_task = row["start"] <= day <= row["end"]
+                is_today = day == today
+
+                if in_task and is_today:
+                    cells.append(f"[bold {theme['task_bar_today']}]█[/]")
+                elif in_task:
+                    cells.append(f"[bold {theme['task_bar']}]█[/]")
+                elif weekend:
+                    cells.append("░")
+                elif is_today:
+                    cells.append("[reverse] [/]") 
+                else:
+                    cells.append(" ")
+
+            right_lines.append("│".join(f"{c:^3}" for c in cells))
+
+        return left_lines, right_lines
 
     def get_current_task_index(self) -> int | None:
         if not self.selected_project or self.selected_project not in self.projects:
@@ -801,6 +708,28 @@ class PyGanttApp(App):
         self.theme_data = THEMES[self.theme_name]
         self.apply_theme()
         self.notify(f"Theme changed to {self.theme_name}.")
+
+    def action_toggle_project_selection(self) -> None:
+        tree = self.query_one("#projects", Tree)
+        node = tree.cursor_node
+
+        if node is None:
+            return
+
+        project_name = node.data or str(node.label)
+
+        if project_name not in self.projects:
+            return
+
+        if project_name in self.selected_projects:
+            self.selected_projects.remove(project_name)
+            self.notify(f"Removed '{project_name}' from Gantt selection.")
+        else:
+            self.selected_projects.add(project_name)
+            self.notify(f"Added '{project_name}' to Gantt selection.")
+
+        self.refresh_project_tree()
+        self.refresh_gantt_view()
 
     def handle_add_project(self, project_name: str | None) -> None:
         if not project_name:
@@ -1002,8 +931,10 @@ class PyGanttApp(App):
         today = datetime.now().date()
 
         selected_rows = []
-        selected = sorted(self.selected_projects) if self.selected_projects else (
-            [self.selected_project] if self.selected_project else []
+        selected = (
+            sorted(self.selected_projects)
+            if self.selected_projects
+            else ([self.selected_project] if self.selected_project else [])
         )
 
         for project_name in selected:
@@ -1015,31 +946,8 @@ class PyGanttApp(App):
         else:
             anchor = today
 
-        month_offset = getattr(self, "gantt_month_offset", 0)
         visible_month = self._shift_month(anchor, self.gantt_month_offset)
         return self._month_bounds(visible_month)
-
-    def action_toggle_project_selection(self) -> None:
-        tree = self.query_one("#projects", Tree)
-        node = tree.cursor_node
-
-        if node is None:
-            return
-
-        project_name = node.data or str(node.label)
-
-        if project_name not in self.projects:
-            return
-
-        if project_name in self.selected_projects:
-            self.selected_projects.remove(project_name)
-            self.notify(f"Removed '{project_name}' from Gantt selection.")
-        else:
-            self.selected_projects.add(project_name)
-            self.notify(f"Added '{project_name}' to Gantt selection.")
-
-        self.refresh_project_tree()
-        self.refresh_gantt_view()    
 
 
 def main() -> None:
