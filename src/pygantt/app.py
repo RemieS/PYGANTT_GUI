@@ -1,6 +1,5 @@
 from datetime import datetime, timedelta
 
-
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical, Container, ScrollableContainer
 from textual.screen import ModalScreen
@@ -17,7 +16,7 @@ from textual.widgets import (
     TabPane,
 )
 
-from data import (
+from .data import (
     load_projects,
     save_projects,
     add_project,
