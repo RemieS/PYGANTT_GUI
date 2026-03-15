@@ -1,4 +1,7 @@
 from datetime import datetime, timedelta
+from logging import root
+from platform import node
+
 
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical, Container, ScrollableContainer
@@ -26,8 +29,45 @@ from .data import (
     delete_task,
 )
 
+# PUT THIS HERE
+THEMES = {
+    "retro_neon": {
+        "banner": "#ff3df5",
+        "border_primary": "cyan",
+        "border_secondary": "magenta",
+        "border_task": "#ff00d4",
+        "task_bar": "#ff00d4",
+        "task_bar_today": "#00f0ff",
+        "weekend_fill": "#444444",
+        "text": "white",
+    },
+    "ice_neon": {
+        "banner": "#6fffe9",
+        "border_primary": "#6fffe9",
+        "border_secondary": "#9b5de5",
+        "border_task": "#00bbf9",
+        "task_bar": "#00bbf9",
+        "task_bar_today": "#9b5de5",
+        "weekend_fill": "#3a3a3a",
+        "text": "white",
+    },
+    "acid_neon": {
+        "banner": "#39ff14",
+        "border_primary": "#39ff14",
+        "border_secondary": "#ffea00",
+        "border_task": "#39ff14",
+        "task_bar": "#39ff14",
+        "task_bar_today": "#ffea00",
+        "weekend_fill": "#444444",
+        "text": "white",
+    },
+}
+
 class Banner(Static):
     def on_mount(self) -> None:
+        self.refresh_banner()
+
+    def refresh_banner(self) -> None:
         banner = r"""
 ██████╗ ██╗   ██╗ ██████╗  █████╗ ███╗   ██╗████████╗████████╗
 ██╔══██╗╚██╗ ██╔╝██╔════╝ ██╔══██╗████╗  ██║╚══██╔══╝╚══██╔══╝
@@ -37,11 +77,11 @@ class Banner(Static):
 ╚═╝        ╚═╝    ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═══╝   ╚═╝      ╚═╝
 """
         subtitle = "A Python-based retro Gantt chart tool, by Remie Stronks"
+        theme = self.app.theme_data
 
         self.update(
-            f"[bold underline #ff3df5]{banner}[/]\n"
-            #  f"[bold #ff3df5]{banner}[/]\n"
-            f"[italic white]{subtitle}[/]"
+            f"[bold underline {theme['banner']}]{banner}[/]\n"
+            f"[italic {theme['text']}]{subtitle}[/]"
         )
 
 
@@ -225,19 +265,21 @@ class GanttView(Static):
             for row, label in zip(rows, row_labels):
                 gantt_row = self._left_prefix("", label, row_label_width)
 
+                theme = self.app.theme_data
+
                 for day in days:
                     weekend = day.weekday() >= 5
                     in_task = row["start"] <= day <= row["end"]
                     is_today = day == today
 
                     if in_task and weekend and is_today:
-                        cell = self._cell("█", style="reverse dim")
+                        cell = self._cell("█", style=f"reverse bold {theme['task_bar_today']}")
                     elif in_task and is_today:
-                        cell = self._cell("█", style="reverse bold green")
+                        cell = self._cell("█", style=f"reverse bold {theme['task_bar_today']}")
                     elif in_task and weekend:
-                        cell = self._cell("█", weekend=True)
+                        cell = self._cell("█", style=f"bold {theme['task_bar']}")
                     elif in_task:
-                        cell = self._cell("█", style="bold green")
+                        cell = self._cell("█", style=f"bold {theme['task_bar']}")
                     elif weekend and is_today:
                         cell = self._cell("░", style="reverse dim")
                     elif weekend:
@@ -511,7 +553,7 @@ class PyGanttApp(App):
     #banner {
         height: auto;
         padding: 1 2;
-        border: round cyan;
+        border: round white;
         color: white;
     }
 
@@ -521,7 +563,7 @@ class PyGanttApp(App):
 
     #projects {
         width: 30%;
-        border: solid cyan;
+        border: solid white;
     }
 
     #right-pane {
@@ -533,12 +575,13 @@ class PyGanttApp(App):
     }
 
     #tasks-pane {
-        height: 1fr;
+        height: 70%;
+        border: solid white;
     }
 
     #tasks {
         height: 70%;
-        border: solid green;
+        border: solid #ff00d4;
     }
 
     #details {
@@ -550,7 +593,7 @@ class PyGanttApp(App):
     #gantt-scroll {
         overflow-x: auto;
         overflow-y: auto;
-        border: solid cyan;
+        border: solid white;
     }
 
     #gantt {
@@ -572,6 +615,7 @@ class PyGanttApp(App):
         ("[", "previous_gantt_month", "Prev Month"),
         ("]", "next_gantt_month", "Next Month"),
         ("0", "reset_gantt_month", "Current Month"),
+        ("p", "cycle_theme", "Theme"),
     ]
 
     def __init__(self):
@@ -580,6 +624,10 @@ class PyGanttApp(App):
         self.selected_project: str | None = None
         self.selected_projects: set[str] = set()
         self.gantt_month_offset = 0
+
+        self.theme_names = list(THEMES.keys())
+        self.theme_name = "retro_neon"
+        self.theme_data = THEMES[self.theme_name]
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -606,6 +654,19 @@ class PyGanttApp(App):
         table.cursor_type = "row"
         table.add_columns("Task", "Assignee", "Start", "End")
         self.refresh_project_tree()
+        self.apply_theme()
+        self.refresh_gantt_view()
+    
+    def apply_theme(self) -> None:
+        theme = self.theme_data
+
+        self.query_one("#banner").styles.border = ("round", theme["border_primary"])
+        self.query_one("#projects").styles.border = ("solid", theme["border_primary"])
+        self.query_one("#tasks").styles.border = ("solid", theme["border_task"])
+        self.query_one("#details").styles.border = ("solid", theme["border_secondary"])
+        self.query_one("#gantt-scroll").styles.border = ("solid", theme["border_primary"])
+
+        self.query_one("#banner", Banner).refresh_banner()
         self.refresh_gantt_view()
 
     def refresh_project_tree(self) -> None:
@@ -619,13 +680,16 @@ class PyGanttApp(App):
 
         root.expand()
 
+
     def action_toggle_project_selection(self) -> None:
         tree = self.query_one("#projects", Tree)
         node = tree.cursor_node
+
         if node is None:
             return
 
-        project_name = str(node.label)
+        project_name = node.data or str(node.label)
+
         if project_name not in self.projects:
             return
 
@@ -636,7 +700,8 @@ class PyGanttApp(App):
             self.selected_projects.add(project_name)
             self.notify(f"Added '{project_name}' to Gantt selection.")
 
-        self.refresh_gantt_view()    
+        self.refresh_project_tree()
+        self.refresh_gantt_view() 
 
     def refresh_task_table(self) -> None:
         table = self.query_one("#tasks", DataTable)
@@ -728,6 +793,14 @@ class PyGanttApp(App):
     def action_reset_gantt_month(self) -> None:
         self.gantt_month_offset = 0
         self.refresh_gantt_view()
+
+    def action_cycle_theme(self) -> None:
+        current_index = self.theme_names.index(self.theme_name)
+        next_index = (current_index + 1) % len(self.theme_names)
+        self.theme_name = self.theme_names[next_index]
+        self.theme_data = THEMES[self.theme_name]
+        self.apply_theme()
+        self.notify(f"Theme changed to {self.theme_name}.")
 
     def handle_add_project(self, project_name: str | None) -> None:
         if not project_name:
