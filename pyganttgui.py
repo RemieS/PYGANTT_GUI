@@ -969,6 +969,9 @@ class PyGanttApp(App):
         self.refresh_project_tree()
         self.refresh_gantt_view()    
 
+def main():
+    PyGanttApp().run()
+
 
 if __name__ == "__main__":
-    PyGanttApp().run()
+    main()
