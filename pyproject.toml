@@ -17,7 +17,7 @@ dependencies = [
 ]
 
 [project.scripts]
-pygantt = "pygantt.app:main"
+pyganttgui = "pygantt.app:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
