@@ -39,6 +39,10 @@ Dependencies:
 ```bash
 pip install git+https://github.com/RemieS/PYGANTT_GUI.git
 
+## Install from GitHub with pipx
+
+pipx install git+https://github.com/RemieS/PYGANTT_GUI.git
+
 # Upgrade
 
 ```bash
