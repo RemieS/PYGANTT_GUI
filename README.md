@@ -64,7 +64,7 @@ pipx install git+https://github.com/RemieS/PYGANTT_GUI.git
 ### Upgrade
 
 ``` bash
-pipx upgrade pyganttgui
+pipx install --force git+https://github.com/RemieS/PYGANTT_GUI.git
 ```
 
 ------------------------------------------------------------------------
