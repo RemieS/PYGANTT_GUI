@@ -16,7 +16,7 @@ from textual.widgets import (
     TabPane,
 )
 
-from data import (
+from .data import (
     load_projects,
     save_projects,
     add_project,
