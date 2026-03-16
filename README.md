@@ -1,55 +1,92 @@
+# PyGantt
 
-A **retro styled Gantt chart planner for your terminal**, built with  
+A **retro-styled Gantt chart planner for your terminal**, built with\
 [Textual](https://textual.textualize.io).
 
-PyGantt lets you manage projects and tasks while visualizing them in a clean  
+PyGantt lets you manage projects and tasks while visualizing them in a
+clean\
 terminal-based Gantt chart with a nostalgic retro interface.
 
 Created by **Remie Stronks**.
 
----
+------------------------------------------------------------------------
 
 # Features
 
-- 📁 Project management
-- 📅 Task planning with start and end dates
-- 📊 Interactive Gantt chart
-- 🖥️ Retro terminal interface
-- 🧭 Scrollable timeline
-- 📆 Week, month and day overview
-- 🐧 Works great on Linux terminals
-- 🖱 Optional desktop launcher
+-   📁 Project management
+-   📅 Task planning with start and end dates
+-   📊 Interactive Gantt chart
+-   🖥️ Retro terminal interface
+-   🧭 Scrollable timeline
+-   📆 Week, month and day overview
+-   🐧 Works great on Linux terminals
+-   🖱 Optional desktop launcher
 
----
+------------------------------------------------------------------------
 
 # Requirements
 
-Python **3.9+**
+-   Python **3.9+**
 
 Dependencies:
 
-- `textual`
+-   `textual`
 
----
+------------------------------------------------------------------------
 
 # Installation
 
-## Install from GitHub with pip
+## Install with pip
 
-```bash
+``` bash
 pip install git+https://github.com/RemieS/PYGANTT_GUI.git
+```
 
-## Install from GitHub with pipx
+### Upgrade
 
-pipx install git+https://github.com/RemieS/PYGANTT_GUI.git
-
-# Upgrade
-
-```bash
+``` bash
 pip install --upgrade git+https://github.com/RemieS/PYGANTT_GUI.git
+```
 
-#Launch *(while in terminal)*
+------------------------------------------------------------------------
 
-```bash
+## Install with pipx (recommended)
+
+`pipx` installs the application in an isolated environment while making
+the command globally available.
+
+### Install
+
+``` bash
+pipx install git+https://github.com/RemieS/PYGANTT_GUI.git
+```
+
+### Upgrade
+
+``` bash
+pipx upgrade pyganttgui
+```
+
+------------------------------------------------------------------------
+
+# Launch
+
+Run the application from your terminal:
+
+``` bash
 pyganttgui
+```
 
+------------------------------------------------------------------------
+
+# Project Repository
+
+GitHub:
+
+https://github.com/RemieS/PYGANTT_GUI
+
+------------------------------------------------------------------------
+
+# License
+
+MIT License
