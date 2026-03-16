@@ -39,7 +39,7 @@ Dependencies:
 ```bash
 pip install git+https://github.com/RemieS/PYGANTT_GUI.git
 
-#Upgrade
+# Upgrade
 
 ```bash
 pip install --upgrade git+https://github.com/RemieS/PYGANTT_GUI.git
