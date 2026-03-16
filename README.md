@@ -34,7 +34,7 @@ Dependencies:
 
 # Installation
 
-## Install from GitHub
+## Install from GitHub with pip
 
 ```bash
 pip install git+https://github.com/RemieS/PYGANTT_GUI.git
