@@ -16,7 +16,7 @@ from textual.widgets import (
     TabPane,
 )
 
-from .data import (
+from data import (
     load_projects,
     save_projects,
     add_project,
@@ -36,6 +36,7 @@ THEMES = {
         "task_bar_today": "#00f0ff",
         "weekend_fill": "#444444",
         "text": "white",
+        "background": "#000000",
     },
     "ice_neon": {
         "banner": "#6fffe9",
@@ -46,6 +47,7 @@ THEMES = {
         "task_bar_today": "#9b5de5",
         "weekend_fill": "#3a3a3a",
         "text": "white",
+        "background": "#000000",
     },
     "acid_neon": {
         "banner": "#39ff14",
@@ -56,6 +58,29 @@ THEMES = {
         "task_bar_today": "#ffea00",
         "weekend_fill": "#444444",
         "text": "white",
+        "background": "#000000",
+    },
+    "bw_night": {
+        "banner": "white",
+        "border_primary": "white",
+        "border_secondary": "white",
+        "border_task": "white",
+        "task_bar": "white",
+        "task_bar_today": "white",
+        "weekend_fill": "#666666",
+        "text": "white",
+        "background": "#000000",
+    },
+    "bw_day": {
+        "banner": "black",
+        "border_primary": "black",
+        "border_secondary": "black",
+        "border_task": "black",
+        "task_bar": "black",
+        "task_bar_today": "black",
+        "weekend_fill": "#bbbbbb",
+        "text": "black",
+        "background": "#ffffff",
     },
 }
 
@@ -357,9 +382,28 @@ class PyGanttApp(App):
     #right-pane {
         width: 70%;
     }
-
+    
     #tabs {
         height: 1fr;
+    }
+
+    TabbedContent {
+        background: transparent;
+        color: white;
+    }
+
+    Tabs {
+        background: transparent;
+        color: white;
+    }
+
+    Tab {
+        background: transparent;
+        color: white;
+    }
+
+    Tab.--active {
+        text-style: bold;
     }
 
     #tasks-pane {
@@ -463,22 +507,65 @@ class PyGanttApp(App):
         table.cursor_type = "row"
         table.add_columns("Task", "Assignee", "Start", "End")
 
-        table.styles.color = "white"
-        table.styles.background = "#111111"
+        table.styles.color = self.theme_data["text"]
+        table.styles.background = self.theme_data["background"]
 
         self.refresh_project_tree()
         self.apply_theme()
+        self.refresh_gantt_view()
+    
+    def on_resize(self) -> None:
         self.refresh_gantt_view()
 
     def apply_theme(self) -> None:
         theme = self.theme_data
 
+        self.styles.background = theme["background"]
+
         self.query_one("#banner").styles.border = ("round", theme["border_primary"])
+        self.query_one("#banner").styles.background = theme["background"]
+        self.query_one("#banner").styles.color = theme["text"]
+
         self.query_one("#projects").styles.border = ("solid", theme["border_primary"])
+        self.query_one("#projects").styles.background = theme["background"]
+        self.query_one("#projects").styles.color = theme["text"]
+
+        self.query_one("#tabs").styles.background = theme["background"]
+        self.query_one("#tabs").styles.color = theme["text"]
+
+        self.query_one("#tasks-pane").styles.border = ("solid", theme["border_primary"])
+        self.query_one("#tasks-pane").styles.background = theme["background"]
+        self.query_one("#tasks-pane").styles.color = theme["text"]
+
         self.query_one("#tasks").styles.border = ("solid", theme["border_task"])
+        self.query_one("#tasks").styles.background = theme["background"]
+        self.query_one("#tasks").styles.color = theme["text"]
+
         self.query_one("#details").styles.border = ("solid", theme["border_secondary"])
+        self.query_one("#details").styles.background = theme["background"]
+        self.query_one("#details").styles.color = theme["text"]
+
         self.query_one("#gantt-labels-scroll").styles.border = ("solid", theme["border_primary"])
+        self.query_one("#gantt-labels-scroll").styles.background = theme["background"]
+        self.query_one("#gantt-labels-scroll").styles.color = theme["text"]
+
         self.query_one("#gantt-timeline-scroll").styles.border = ("solid", theme["border_primary"])
+        self.query_one("#gantt-timeline-scroll").styles.background = theme["background"]
+        self.query_one("#gantt-timeline-scroll").styles.color = theme["text"]
+
+        self.query_one("#gantt-labels").styles.background = theme["background"]
+        self.query_one("#gantt-labels").styles.color = theme["text"]
+
+        self.query_one("#gantt-timeline").styles.background = theme["background"]
+        self.query_one("#gantt-timeline").styles.color = theme["text"]
+
+        for tabs in self.query("Tabs"):
+            tabs.styles.background = theme["background"]
+            tabs.styles.color = theme["text"]
+
+        for tab in self.query("Tab"):
+            tab.styles.background = theme["background"]
+            tab.styles.color = theme["text"]
 
         self.query_one("#banner", Banner).refresh_banner()
         self.refresh_gantt_view()
@@ -513,23 +600,44 @@ class PyGanttApp(App):
         self.query_one("#details", TaskDetails).show_task(None)
         self.refresh_gantt_view()
 
-    def refresh_gantt_view(self) -> None:
-        labels = self.query_one("#gantt-labels", Static)
-        timeline = self.query_one("#gantt-timeline", Static)
-
-        selected = (
+    def get_selected_projects_for_gantt(self) -> list[str]:
+        return (
             sorted(self.selected_projects)
             if self.selected_projects
             else ([self.selected_project] if self.selected_project else [])
         )
 
+    def get_gantt_day_cell_width(self, total_days: int) -> int:
+        """Return a dynamic cell width so the timeline fills the available pane."""
+        scroll = self.query_one("#gantt-timeline-scroll", ScrollableContainer)
+
+        # Small safety margin because the Static has padding and borders around it.
+        available_width = max(20, scroll.size.width - 4)
+
+        # We need room for separators too: one separator between each cell.
+        # total content width ~= total_days * cell_width + (total_days - 1)
+        # Solve for cell_width.
+        cell_width = max(2, available_width // max(1, total_days) - 1)
+
+        # Keep it within a readable range.
+        return min(cell_width, 8)
+
+    def refresh_gantt_view(self) -> None:
+        labels = self.query_one("#gantt-labels", Static)
+        timeline = self.query_one("#gantt-timeline", Static)
+
+        selected = self.get_selected_projects_for_gantt()
         start_date, end_date = self.get_gantt_visible_range()
+
+        total_days = (end_date - start_date).days + 1
+        cell_width = self.get_gantt_day_cell_width(total_days)
 
         left_lines, right_lines = self.build_gantt_lines(
             selected,
             self.projects,
             start_date,
             end_date,
+            cell_width,
         )
 
         labels.update("\n".join(left_lines))
@@ -541,6 +649,7 @@ class PyGanttApp(App):
         projects: dict[str, list[dict]],
         start_date,
         end_date,
+        cell_width: int,
     ) -> tuple[list[str], list[str]]:
         today = datetime.now().date()
 
@@ -562,26 +671,31 @@ class PyGanttApp(App):
 
         row_labels = [f"{row['project']} / {row['task']}" for row in rows] if rows else []
 
-        year_values = [f"{day.year % 100:02d}" for day in days]
-        month_values = [day.strftime("%b") for day in days]
-        week_values = [f"W{day.isocalendar().week:02d}" for day in days]
-        date_values = [f"{day.day:02d}" for day in days]
-        day_values = [day.strftime("%a")[:2] for day in days]
-
         left_lines: list[str] = []
         right_lines: list[str] = []
+
+        def fit(value: str) -> str:
+            if len(value) <= cell_width:
+                return f"{value:^{cell_width}}"
+            return value[:cell_width]
 
         def grouped(values: list[str]) -> str:
             previous = None
             row = []
             for value in values:
                 shown = value if value != previous else ""
-                row.append(f"{shown:^3}")
+                row.append(fit(shown))
                 previous = value
             return "│".join(row)
 
         def plain(values: list[str]) -> str:
-            return "│".join(f"{v:^3}" for v in values)
+            return "│".join(fit(v) for v in values)
+
+        year_values = [f"{day.year % 100:02d}" for day in days]
+        month_values = [day.strftime("%b") for day in days]
+        week_values = [f"W{day.isocalendar().week:02d}" for day in days]
+        date_values = [f"{day.day:02d}" for day in days]
+        day_values = [day.strftime("%a")[:2] for day in days]
 
         left_lines.append("Year")
         right_lines.append(grouped(year_values))
@@ -599,22 +713,54 @@ class PyGanttApp(App):
         right_lines.append(plain(day_values))
 
         left_lines.append("─" * 24)
-        right_lines.append("─" * (4 * total_days))
+        right_lines.append("─" * ((cell_width + 1) * total_days - 1))
 
         theme = self.theme_data
+
+        def make_cell(content: str = "", style: str | None = None) -> str:
+            text = fit(content)
+            if style:
+                return f"[{style}]{text}[/]"
+            return text
 
         if not rows:
             left_lines.append("No tasks planned")
             empty_cells = []
+
             for day in days:
                 if day == today:
-                    empty_cells.append("[reverse] [/]")  # highlight today
+                    empty_cells.append(make_cell("■", f"bold {theme['task_bar_today']}"))
                 elif day.weekday() >= 5:
-                    empty_cells.append("░")
+                    empty_cells.append(make_cell("░"))
                 else:
-                    empty_cells.append(" ")
-            right_lines.append("│".join(f"{c:^3}" for c in empty_cells))
+                    empty_cells.append(make_cell(" "))
+
+            right_lines.append("│".join(empty_cells))
             return left_lines, right_lines
+
+        for row, label in zip(rows, row_labels):
+            left_lines.append(label)
+            cells = []
+
+            for day in days:
+                weekend = day.weekday() >= 5
+                in_task = row["start"] <= day <= row["end"]
+                is_today = day == today
+
+                if in_task and is_today:
+                    cells.append(make_cell("█", f"bold {theme['task_bar_today']}"))
+                elif in_task:
+                    cells.append(make_cell("█", f"bold {theme['task_bar']}"))
+                elif is_today:
+                    cells.append(make_cell("│", f"bold {theme['task_bar_today']}"))
+                elif weekend:
+                    cells.append(make_cell("░"))
+                else:
+                    cells.append(make_cell(" "))
+
+            right_lines.append("│".join(cells))
+
+        return left_lines, right_lines
 
         for row, label in zip(rows, row_labels):
             left_lines.append(label)
