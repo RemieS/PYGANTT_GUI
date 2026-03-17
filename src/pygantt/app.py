@@ -403,7 +403,7 @@ class PyGanttApp(App):
     }
 
     #gantt-labels-scroll {
-        width: 32;
+        width: 36;
         overflow-x: hidden;
         overflow-y: auto;
         border: solid cyan;
@@ -417,7 +417,7 @@ class PyGanttApp(App):
     }
 
     #gantt-labels {
-        width: 32;
+        width: 36;
         padding: 1;
     }
 
@@ -437,7 +437,7 @@ class PyGanttApp(App):
         ("space", "toggle_project_selection", "Toggle Project"),
         ("[", "previous_gantt_month", "Prev Month"),
         ("]", "next_gantt_month", "Next Month"),
-        ("0", "reset_gantt_month", "Current Month"),
+        ("0", "reset_gantt_month", "Reset View"),
         ("p", "cycle_theme", "Theme"),
     ]
 
@@ -447,7 +447,7 @@ class PyGanttApp(App):
         self.selected_project: str | None = None
         self.selected_task_index: int | None = None
         self.selected_projects: set[str] = set()
-        self.gantt_month_offset = 0
+        self.gantt_day_offset = 0
 
         self.theme_names = list(THEMES.keys())
         self.theme_name = "retro_neon"
@@ -611,7 +611,7 @@ class PyGanttApp(App):
                     }
                 )
 
-        row_labels = [f"{row['project']} / {row['task']}" for row in rows]
+        row_labels = [f"• {row['task']}" for row in rows]
 
         left_lines = []
         right_lines = []
@@ -644,12 +644,12 @@ class PyGanttApp(App):
 
         # HEADER
         year = [f"{d.year % 100:02d}" for d in days]
-        month = [f"{d.month:02d}" for d in days]
+        month = [day.strftime("%b")[:2] for day in days]
         week = [f"{d.isocalendar().week:02d}" for d in days]
         date = [f"{d.day:02d}" for d in days]
         dow = [d.strftime("%a")[:2] for d in days]
 
-        left_lines += ["Yr", "Mo", "Wk", "Dt", "Dy"]
+        left_lines += ["Year", "Month", "Week", "Date", "Day"]
         right_lines += [
             grouped(year),
             grouped(month),
@@ -737,15 +737,19 @@ class PyGanttApp(App):
         self.push_screen(AddProjectScreen(), self.handle_add_project)
 
     def action_previous_gantt_month(self) -> None:
-        self.gantt_month_offset -= 1
+        start_date, end_date = self.get_base_gantt_range()
+        screen_days = max(1, (end_date - start_date).days + 1)
+        self.gantt_day_offset -= screen_days
         self.refresh_gantt_view()
 
     def action_next_gantt_month(self) -> None:
-        self.gantt_month_offset += 1
+        start_date, end_date = self.get_base_gantt_range()
+        screen_days = max(1, (end_date - start_date).days + 1)
+        self.gantt_day_offset += screen_days
         self.refresh_gantt_view()
 
     def action_reset_gantt_month(self) -> None:
-        self.gantt_month_offset = 0
+        self.gantt_day_offset = 0
         self.refresh_gantt_view()
 
     def action_cycle_theme(self) -> None:
@@ -963,18 +967,18 @@ class PyGanttApp(App):
         self.notify(f"Project '{project_name}' deleted.")
 
     def _shift_month(self, date_value, offset: int):
-        year = date_value.year + (date_value.month - 1 + offset) // 12
-        month = (date_value.month - 1 + offset) % 12 + 1
-        return date_value.replace(year=year, month=month, day=1)
+        target_year = date_value.year + (date_value.month - 1 + offset) // 12
+        target_month = (date_value.month - 1 + offset) % 12 + 1
+        target_day = min(date_value.day, monthrange(target_year, target_month)[1])
+        return date_value.replace(year=target_year, month=target_month, day=target_day)
 
     def _month_bounds(self, date_value):
         first_day = date_value.replace(day=1)
         last_day = date_value.replace(day=monthrange(date_value.year, date_value.month)[1])
         return first_day, last_day
-
-    def get_gantt_visible_range(self):
+    
+    def get_base_gantt_range(self):
         today = datetime.now().date()
-
         selected_rows = []
         selected = self.get_selected_projects_for_gantt()
 
@@ -982,13 +986,28 @@ class PyGanttApp(App):
             for task in self.projects.get(project_name, []):
                 selected_rows.append(task)
 
-        if selected_rows:
-            anchor = min(task["start"].date() for task in selected_rows)
-        else:
-            anchor = today
+        if not selected_rows:
+            return self._month_bounds(today)
 
-        visible_month = self._shift_month(anchor, self.gantt_month_offset)
-        return self._month_bounds(visible_month)
+        start = min(task["start"].date() for task in selected_rows)
+        end = max(task["end"].date() for task in selected_rows)
+
+        buffer_days = 3
+        start -= timedelta(days=buffer_days)
+        end += timedelta(days=buffer_days)
+
+        return start, end
+
+    def get_gantt_visible_range(self):
+        start, end = self.get_base_gantt_range()
+
+        if self.gantt_day_offset == 0:
+            return start, end
+
+        shift = timedelta(days=self.gantt_day_offset)
+        return start + shift, end + shift
+
+        return start, end
 
 
 def main() -> None:
