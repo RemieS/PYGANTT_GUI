@@ -1,20 +1,10 @@
 from datetime import datetime, timedelta
+from calendar import monthrange
 
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical, Container, ScrollableContainer
 from textual.screen import ModalScreen
-from textual.widgets import (
-    Header,
-    Footer,
-    Tree,
-    DataTable,
-    Static,
-    Input,
-    Button,
-    Label,
-    TabbedContent,
-    TabPane,
-)
+from textual.widgets import Header, Footer, Tree, Static, Input, Button, Label
 
 from .data import (
     load_projects,
@@ -25,6 +15,7 @@ from .data import (
     delete_project,
     delete_task,
 )
+
 
 THEMES = {
     "retro_neon": {
@@ -118,6 +109,19 @@ class TaskDetails(Static):
             f"Assignee: {task['assignee']}\n"
             f"Start: {task['start'].strftime('%Y-%m-%d')}\n"
             f"End: {task['end'].strftime('%Y-%m-%d')}"
+        )
+
+    def show_project(self, project_name: str | None, tasks: list[dict] | None) -> None:
+        if not project_name:
+            self.update("No project selected.")
+            return
+
+        count = len(tasks or [])
+        self.update(
+            f"[b]{project_name}[/b]\n"
+            f"Tasks: {count}\n"
+            f"Use [b]t[/b] to add a task.\n"
+            f"Select a task in the tree to view details."
         )
 
 
@@ -311,7 +315,6 @@ class TaskEditorScreen(ModalScreen[dict | None]):
         if event.button.id == "cancel":
             self.dismiss(None)
             return
-
         self.submit_task()
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
@@ -374,50 +377,23 @@ class PyGanttApp(App):
         height: 1fr;
     }
 
-    #projects {
+    #sidebar {
         width: 30%;
+        height: 1fr;
+    }
+
+    #projects {
+        height: 1fr;
         border: solid white;
     }
 
     #right-pane {
         width: 70%;
-    }
-    
-    #tabs {
         height: 1fr;
     }
 
-    TabbedContent {
-        background: transparent;
-        color: white;
-    }
-
-    Tabs {
-        background: transparent;
-        color: white;
-    }
-
-    Tab {
-        background: transparent;
-        color: white;
-    }
-
-    Tab.--active {
-        text-style: bold;
-    }
-
-    #tasks-pane {
-        height: 70%;
-        border: solid white;
-    }
-
-    #tasks {
-        height: 70%;
-        border: solid #ff00d4;
-    }
-
     #details {
-        height: 30%;
+        height: 8;
         border: solid magenta;
         padding: 1;
     }
@@ -458,8 +434,6 @@ class PyGanttApp(App):
         ("t", "add_task", "Add Task"),
         ("e", "edit_selected", "Edit"),
         ("d", "delete_selected", "Delete"),
-        ("g", "show_gantt", "Gantt"),
-        ("w", "show_tasks", "Tasks"),
         ("space", "toggle_project_selection", "Toggle Project"),
         ("[", "previous_gantt_month", "Prev Month"),
         ("]", "next_gantt_month", "Next Month"),
@@ -471,6 +445,7 @@ class PyGanttApp(App):
         super().__init__()
         self.projects = load_projects()
         self.selected_project: str | None = None
+        self.selected_task_index: int | None = None
         self.selected_projects: set[str] = set()
         self.gantt_month_offset = 0
 
@@ -483,37 +458,27 @@ class PyGanttApp(App):
         yield Banner(id="banner")
 
         with Horizontal(id="main"):
-            yield Tree("Projects", id="projects")
+            with Vertical(id="sidebar"):
+                yield Tree("Projects", id="projects")
 
             with Vertical(id="right-pane"):
-                with TabbedContent(id="tabs"):
-                    with TabPane("Tasks", id="tasks-tab"):
-                        with Vertical(id="tasks-pane"):
-                            yield DataTable(id="tasks")
-                            yield TaskDetails("No task selected.", id="details")
+                yield TaskDetails("No task selected.", id="details")
 
-                    with TabPane("Gantt", id="gantt-tab"):
-                        with Horizontal(id="gantt-wrapper"):
-                            with ScrollableContainer(id="gantt-labels-scroll"):
-                                yield Static(id="gantt-labels")
+                with Horizontal(id="gantt-wrapper"):
+                    with ScrollableContainer(id="gantt-labels-scroll"):
+                        yield Static(id="gantt-labels")
 
-                            with ScrollableContainer(id="gantt-timeline-scroll"):
-                                yield Static(id="gantt-timeline")
+                    with ScrollableContainer(id="gantt-timeline-scroll"):
+                        yield Static(id="gantt-timeline")
 
         yield Footer()
 
     def on_mount(self) -> None:
-        table = self.query_one("#tasks", DataTable)
-        table.cursor_type = "row"
-        table.add_columns("Task", "Assignee", "Start", "End")
-
-        table.styles.color = self.theme_data["text"]
-        table.styles.background = self.theme_data["background"]
-
         self.refresh_project_tree()
         self.apply_theme()
+        self.refresh_details()
         self.refresh_gantt_view()
-    
+
     def on_resize(self) -> None:
         self.refresh_gantt_view()
 
@@ -529,17 +494,6 @@ class PyGanttApp(App):
         self.query_one("#projects").styles.border = ("solid", theme["border_primary"])
         self.query_one("#projects").styles.background = theme["background"]
         self.query_one("#projects").styles.color = theme["text"]
-
-        self.query_one("#tabs").styles.background = theme["background"]
-        self.query_one("#tabs").styles.color = theme["text"]
-
-        self.query_one("#tasks-pane").styles.border = ("solid", theme["border_primary"])
-        self.query_one("#tasks-pane").styles.background = theme["background"]
-        self.query_one("#tasks-pane").styles.color = theme["text"]
-
-        self.query_one("#tasks").styles.border = ("solid", theme["border_task"])
-        self.query_one("#tasks").styles.background = theme["background"]
-        self.query_one("#tasks").styles.color = theme["text"]
 
         self.query_one("#details").styles.border = ("solid", theme["border_secondary"])
         self.query_one("#details").styles.background = theme["background"]
@@ -559,15 +513,8 @@ class PyGanttApp(App):
         self.query_one("#gantt-timeline").styles.background = theme["background"]
         self.query_one("#gantt-timeline").styles.color = theme["text"]
 
-        for tabs in self.query("Tabs"):
-            tabs.styles.background = theme["background"]
-            tabs.styles.color = theme["text"]
-
-        for tab in self.query("Tab"):
-            tab.styles.background = theme["background"]
-            tab.styles.color = theme["text"]
-
         self.query_one("#banner", Banner).refresh_banner()
+        self.refresh_details()
         self.refresh_gantt_view()
 
     def refresh_project_tree(self) -> None:
@@ -575,30 +522,35 @@ class PyGanttApp(App):
         tree.clear()
         root = tree.root
 
-        for project_name in self.projects:
+        for project_name, tasks in self.projects.items():
             label = f"✔ {project_name}" if project_name in self.selected_projects else project_name
-            root.add(label, data=project_name)
+            project_node = root.add(label, data={"type": "project", "project": project_name})
+
+            for index, task in enumerate(tasks):
+                task_label = f"• {task['task']}"
+                project_node.add(
+                    task_label,
+                    data={
+                        "type": "task",
+                        "project": project_name,
+                        "task_index": index,
+                    },
+                )
 
         root.expand()
+        for node in root.children:
+            node.expand()
 
-    def refresh_task_table(self) -> None:
-        table = self.query_one("#tasks", DataTable)
-        table.clear()
+    def refresh_details(self) -> None:
+        details = self.query_one("#details", TaskDetails)
 
-        if not self.selected_project:
-            self.query_one("#details", TaskDetails).show_task(None)
-            return
-
-        for task in self.projects[self.selected_project]:
-            table.add_row(
-                task["task"],
-                task["assignee"],
-                task["start"].strftime("%Y-%m-%d"),
-                task["end"].strftime("%Y-%m-%d"),
-            )
-
-        self.query_one("#details", TaskDetails).show_task(None)
-        self.refresh_gantt_view()
+        if self.selected_project and self.selected_task_index is not None:
+            task = self.get_selected_task()
+            details.show_task(task)
+        elif self.selected_project:
+            details.show_project(self.selected_project, self.projects.get(self.selected_project, []))
+        else:
+            details.show_task(None)
 
     def get_selected_projects_for_gantt(self) -> list[str]:
         return (
@@ -607,21 +559,6 @@ class PyGanttApp(App):
             else ([self.selected_project] if self.selected_project else [])
         )
 
-    def get_gantt_day_cell_width(self, total_days: int) -> int:
-        """Return a dynamic cell width so the timeline fills the available pane."""
-        scroll = self.query_one("#gantt-timeline-scroll", ScrollableContainer)
-
-        # Small safety margin because the Static has padding and borders around it.
-        available_width = max(20, scroll.size.width - 4)
-
-        # We need room for separators too: one separator between each cell.
-        # total content width ~= total_days * cell_width + (total_days - 1)
-        # Solve for cell_width.
-        cell_width = max(2, available_width // max(1, total_days) - 1)
-
-        # Keep it within a readable range.
-        return min(cell_width, 8)
-
     def refresh_gantt_view(self) -> None:
         labels = self.query_one("#gantt-labels", Static)
         timeline = self.query_one("#gantt-timeline", Static)
@@ -629,15 +566,12 @@ class PyGanttApp(App):
         selected = self.get_selected_projects_for_gantt()
         start_date, end_date = self.get_gantt_visible_range()
 
-        total_days = (end_date - start_date).days + 1
-        cell_width = self.get_gantt_day_cell_width(total_days)
-
         left_lines, right_lines = self.build_gantt_lines(
             selected,
             self.projects,
             start_date,
             end_date,
-            cell_width,
+            2,
         )
 
         labels.update("\n".join(left_lines))
@@ -649,12 +583,20 @@ class PyGanttApp(App):
         projects: dict[str, list[dict]],
         start_date,
         end_date,
-        cell_width: int,
+            _cell_width: int,  # ignore incoming value
     ) -> tuple[list[str], list[str]]:
+
         today = datetime.now().date()
 
         total_days = (end_date - start_date).days + 1
         days = [start_date + timedelta(days=i) for i in range(total_days)]
+
+        # 👉 DYNAMIC WIDTH BASED ON SCREEN
+        scroll = self.query_one("#gantt-timeline-scroll", ScrollableContainer)
+        available_width = max(20, scroll.size.width - 4)
+
+        # compute width per column
+        cell_width = max(2, min(6, available_width // total_days - 1))
 
         rows = []
         for project_name in selected_projects:
@@ -669,168 +611,127 @@ class PyGanttApp(App):
                     }
                 )
 
-        row_labels = [f"{row['project']} / {row['task']}" for row in rows] if rows else []
+        row_labels = [f"{row['project']} / {row['task']}" for row in rows]
 
-        left_lines: list[str] = []
-        right_lines: list[str] = []
+        left_lines = []
+        right_lines = []
+        theme = self.theme_data
 
         def fit(value: str) -> str:
-            if len(value) <= cell_width:
-                return f"{value:^{cell_width}}"
-            return value[:cell_width]
+            value = value[:cell_width]
+            return f"{value:^{cell_width}}"
 
-        def grouped(values: list[str]) -> str:
-            previous = None
-            row = []
-            for value in values:
-                shown = value if value != previous else ""
-                row.append(fit(shown))
-                previous = value
-            return "│".join(row)
+        def grouped(values):
+            prev = None
+            cells = []
+            for v in values:
+                shown = v if v != prev else ""
+                cells.append(fit(shown))
+                prev = v
+            return "│".join(cells)
 
-        def plain(values: list[str]) -> str:
+        def plain(values):
             return "│".join(fit(v) for v in values)
 
-        year_values = [f"{day.year % 100:02d}" for day in days]
-        month_values = [day.strftime("%b") for day in days]
-        week_values = [f"W{day.isocalendar().week:02d}" for day in days]
-        date_values = [f"{day.day:02d}" for day in days]
-        day_values = [day.strftime("%a")[:2] for day in days]
+        def bar(style):
+            return f"[{style}]{'█' * cell_width}[/]"
 
-        left_lines.append("Year")
-        right_lines.append(grouped(year_values))
+        def empty():
+            return " " * cell_width
 
-        left_lines.append("Month")
-        right_lines.append(grouped(month_values))
+        def separator():
+            return "│".join(empty() for _ in days)
 
-        left_lines.append("Week")
-        right_lines.append(grouped(week_values))
+        # HEADER
+        year = [f"{d.year % 100:02d}" for d in days]
+        month = [f"{d.month:02d}" for d in days]
+        week = [f"{d.isocalendar().week:02d}" for d in days]
+        date = [f"{d.day:02d}" for d in days]
+        dow = [d.strftime("%a")[:2] for d in days]
 
-        left_lines.append("Date")
-        right_lines.append(plain(date_values))
-
-        left_lines.append("Day")
-        right_lines.append(plain(day_values))
+        left_lines += ["Yr", "Mo", "Wk", "Dt", "Dy"]
+        right_lines += [
+            grouped(year),
+            grouped(month),
+            grouped(week),
+            plain(date),
+            plain(dow),
+        ]
 
         left_lines.append("─" * 24)
         right_lines.append("─" * ((cell_width + 1) * total_days - 1))
 
-        theme = self.theme_data
-
-        def make_cell(content: str = "", style: str | None = None) -> str:
-            text = fit(content)
-            if style:
-                return f"[{style}]{text}[/]"
-            return text
-
         if not rows:
             left_lines.append("No tasks planned")
-            empty_cells = []
-
-            for day in days:
-                if day == today:
-                    empty_cells.append(make_cell("■", f"bold {theme['task_bar_today']}"))
-                elif day.weekday() >= 5:
-                    empty_cells.append(make_cell("░"))
+            row = []
+            for d in days:
+                if d == today:
+                    row.append(bar(f"bold {theme['task_bar_today']}"))
+                elif d.weekday() >= 5:
+                    row.append(fit("░" * cell_width))
                 else:
-                    empty_cells.append(make_cell(" "))
-
-            right_lines.append("│".join(empty_cells))
+                    row.append(fit(""))
+            right_lines.append("│".join(row))
             return left_lines, right_lines
 
-        for row, label in zip(rows, row_labels):
+        # TASK ROWS
+        for i, (row, label) in enumerate(zip(rows, row_labels)):
             left_lines.append(label)
             cells = []
 
-            for day in days:
-                weekend = day.weekday() >= 5
-                in_task = row["start"] <= day <= row["end"]
-                is_today = day == today
+            for d in days:
+                in_task = row["start"] <= d <= row["end"]
+                is_today = d == today
+                weekend = d.weekday() >= 5
 
                 if in_task and is_today:
-                    cells.append(make_cell("█", f"bold {theme['task_bar_today']}"))
+                    cells.append(bar(f"bold {theme['task_bar_today']}"))
                 elif in_task:
-                    cells.append(make_cell("█", f"bold {theme['task_bar']}"))
+                    cells.append(bar(f"bold {theme['task_bar']}"))
                 elif is_today:
-                    cells.append(make_cell("│", f"bold {theme['task_bar_today']}"))
+                    cells.append(bar(f"bold {theme['task_bar_today']}"))
                 elif weekend:
-                    cells.append(make_cell("░"))
+                    cells.append(fit("░" * cell_width))
                 else:
-                    cells.append(make_cell(" "))
+                    cells.append(empty())
 
             right_lines.append("│".join(cells))
 
-        return left_lines, right_lines
-
-        for row, label in zip(rows, row_labels):
-            left_lines.append(label)
-            cells = []
-
-            for day in days:
-                weekend = day.weekday() >= 5
-                in_task = row["start"] <= day <= row["end"]
-                is_today = day == today
-
-                if in_task and is_today:
-                    cells.append(f"[bold {theme['task_bar_today']}]█[/]")
-                elif in_task:
-                    cells.append(f"[bold {theme['task_bar']}]█[/]")
-                elif weekend:
-                    cells.append("░")
-                elif is_today:
-                    cells.append("[reverse] [/]") 
-                else:
-                    cells.append(" ")
-
-            right_lines.append("│".join(f"{c:^3}" for c in cells))
+            # separator row
+            if i < len(rows) - 1:
+                left_lines.append("")
+                right_lines.append(separator())
 
         return left_lines, right_lines
 
-    def get_current_task_index(self) -> int | None:
-        if not self.selected_project or self.selected_project not in self.projects:
+    def get_selected_task(self) -> dict | None:
+        if self.selected_project is None or self.selected_task_index is None:
             return None
 
-        table = self.query_one("#tasks", DataTable)
-        row_index = table.cursor_row
-        tasks = self.projects[self.selected_project]
-
-        if 0 <= row_index < len(tasks):
-            return row_index
-
+        tasks = self.projects.get(self.selected_project, [])
+        if 0 <= self.selected_task_index < len(tasks):
+            return tasks[self.selected_task_index]
         return None
 
-    def get_current_task(self) -> dict | None:
-        row_index = self.get_current_task_index()
-
-        if row_index is None or not self.selected_project:
-            return None
-
-        return self.projects[self.selected_project][row_index]
-
     def on_tree_node_selected(self, event: Tree.NodeSelected) -> None:
-        project_name = event.node.data or str(event.node.label)
+        data = event.node.data
 
-        if project_name not in self.projects:
+        if not isinstance(data, dict):
             return
 
-        self.selected_project = project_name
-        self.refresh_task_table()
+        node_type = data.get("type")
+
+        if node_type == "project":
+            self.selected_project = data["project"]
+            self.selected_task_index = None
+        elif node_type == "task":
+            self.selected_project = data["project"]
+            self.selected_task_index = data["task_index"]
+        else:
+            return
+
+        self.refresh_details()
         self.refresh_gantt_view()
-
-    def on_data_table_row_highlighted(self, event: DataTable.RowHighlighted) -> None:
-        task = self.get_current_task()
-        self.query_one("#details", TaskDetails).show_task(task)
-
-    def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
-        self.action_edit_selected()
-
-    def action_show_gantt(self) -> None:
-        tabs = self.query_one("#tabs", TabbedContent)
-        tabs.active = "gantt-tab"
-
-    def action_show_tasks(self) -> None:
-        tabs = self.query_one("#tabs", TabbedContent)
-        tabs.active = "tasks-tab"
 
     def action_add_project(self) -> None:
         self.push_screen(AddProjectScreen(), self.handle_add_project)
@@ -859,10 +760,11 @@ class PyGanttApp(App):
         tree = self.query_one("#projects", Tree)
         node = tree.cursor_node
 
-        if node is None:
+        if node is None or not isinstance(node.data, dict):
             return
 
-        project_name = node.data or str(node.label)
+        data = node.data
+        project_name = data.get("project")
 
         if project_name not in self.projects:
             return
@@ -900,7 +802,7 @@ class PyGanttApp(App):
         self.push_screen(TaskEditorScreen("Add Task"), self.handle_add_task)
 
     def handle_add_task(self, task_data: dict | None) -> None:
-        if not task_data:
+        if not task_data or not self.selected_project:
             self.notify("Task creation cancelled.")
             return
 
@@ -914,20 +816,21 @@ class PyGanttApp(App):
         )
 
         save_projects(self.projects)
-        self.refresh_task_table()
+        self.refresh_project_tree()
+        self.refresh_details()
+        self.refresh_gantt_view()
         self.notify(f"Task '{task_data['task'].strip()}' added to '{self.selected_project}'.")
 
     def action_edit_selected(self) -> None:
+        task = self.get_selected_task()
+
         if not self.selected_project:
             self.notify("Select a project first.", severity="warning")
             return
 
-        row_index = self.get_current_task_index()
-        if row_index is None:
-            self.notify("Select a task to edit.", severity="warning")
+        if not task:
+            self.notify("Select a task in the tree to edit.", severity="warning")
             return
-
-        task = self.projects[self.selected_project][row_index]
 
         prefilled = {
             "task": task["task"],
@@ -946,19 +849,14 @@ class PyGanttApp(App):
             self.notify("Edit cancelled.")
             return
 
-        if not self.selected_project:
-            self.notify("No project selected.", severity="warning")
-            return
-
-        row_index = self.get_current_task_index()
-        if row_index is None:
+        if self.selected_project is None or self.selected_task_index is None:
             self.notify("No task selected.", severity="warning")
             return
 
         updated = update_task(
             self.projects,
             self.selected_project,
-            row_index,
+            self.selected_task_index,
             task_data["task"],
             task_data["assignee"],
             task_data["start"],
@@ -970,25 +868,23 @@ class PyGanttApp(App):
             return
 
         save_projects(self.projects)
-        self.refresh_task_table()
-        self.query_one("#details", TaskDetails).show_task(None)
+        self.refresh_project_tree()
+        self.refresh_details()
+        self.refresh_gantt_view()
         self.notify(f"Task '{task_data['task'].strip()}' updated.")
 
     def action_delete_selected(self) -> None:
-        if self.selected_project:
-            row_index = self.get_current_task_index()
-            tasks = self.projects.get(self.selected_project, [])
+        task = self.get_selected_task()
 
-            if row_index is not None and 0 <= row_index < len(tasks):
-                task_name = tasks[row_index]["task"]
-                self.push_screen(
-                    ConfirmScreen(
-                        "Delete Task",
-                        f"Delete task '{task_name}' from '{self.selected_project}'?"
-                    ),
-                    self.handle_delete_task,
-                )
-                return
+        if task and self.selected_project is not None:
+            self.push_screen(
+                ConfirmScreen(
+                    "Delete Task",
+                    f"Delete task '{task['task']}' from '{self.selected_project}'?"
+                ),
+                self.handle_delete_task,
+            )
+            return
 
         if self.selected_project:
             self.push_screen(
@@ -1007,18 +903,17 @@ class PyGanttApp(App):
             self.notify("Deletion cancelled.")
             return
 
-        if not self.selected_project:
-            return
-
-        row_index = self.get_current_task_index()
-        tasks = self.projects.get(self.selected_project, [])
-
-        if row_index is None or not (0 <= row_index < len(tasks)):
+        if self.selected_project is None or self.selected_task_index is None:
             self.notify("No valid task selected.", severity="warning")
             return
 
-        task_name = tasks[row_index]["task"]
-        removed = delete_task(self.projects, self.selected_project, row_index)
+        tasks = self.projects.get(self.selected_project, [])
+        if not (0 <= self.selected_task_index < len(tasks)):
+            self.notify("No valid task selected.", severity="warning")
+            return
+
+        task_name = tasks[self.selected_task_index]["task"]
+        removed = delete_task(self.projects, self.selected_project, self.selected_task_index)
 
         if not removed:
             self.notify("Could not delete task.", severity="warning")
@@ -1027,17 +922,21 @@ class PyGanttApp(App):
         if self.selected_project not in self.projects:
             removed_project_name = self.selected_project
             self.selected_project = None
+            self.selected_task_index = None
             save_projects(self.projects)
             self.refresh_project_tree()
-            self.refresh_task_table()
+            self.refresh_details()
+            self.refresh_gantt_view()
             self.notify(
                 f"Task '{task_name}' deleted. Project '{removed_project_name}' removed because it became empty."
             )
             return
 
+        self.selected_task_index = None
         save_projects(self.projects)
-        self.refresh_task_table()
-        self.query_one("#details", TaskDetails).show_task(None)
+        self.refresh_project_tree()
+        self.refresh_details()
+        self.refresh_gantt_view()
         self.notify(f"Task '{task_name}' deleted.")
 
     def handle_delete_project(self, confirmed: bool) -> None:
@@ -1056,9 +955,11 @@ class PyGanttApp(App):
             return
 
         self.selected_project = None
+        self.selected_task_index = None
         save_projects(self.projects)
         self.refresh_project_tree()
-        self.refresh_task_table()
+        self.refresh_details()
+        self.refresh_gantt_view()
         self.notify(f"Project '{project_name}' deleted.")
 
     def _shift_month(self, date_value, offset: int):
@@ -1067,8 +968,6 @@ class PyGanttApp(App):
         return date_value.replace(year=year, month=month, day=1)
 
     def _month_bounds(self, date_value):
-        from calendar import monthrange
-
         first_day = date_value.replace(day=1)
         last_day = date_value.replace(day=monthrange(date_value.year, date_value.month)[1])
         return first_day, last_day
@@ -1077,11 +976,7 @@ class PyGanttApp(App):
         today = datetime.now().date()
 
         selected_rows = []
-        selected = (
-            sorted(self.selected_projects)
-            if self.selected_projects
-            else ([self.selected_project] if self.selected_project else [])
-        )
+        selected = self.get_selected_projects_for_gantt()
 
         for project_name in selected:
             for task in self.projects.get(project_name, []):
