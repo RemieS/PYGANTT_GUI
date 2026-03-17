@@ -9,6 +9,7 @@ from textual.containers import Horizontal, Vertical, Container, ScrollableContai
 from textual.screen import ModalScreen
 from textual.widgets import Header, Footer, Tree, Static, Input, Button, Label
 
+
 from .data import (
     load_projects,
     save_projects,
@@ -26,9 +27,9 @@ THEMES = {
         "border_primary": "cyan",
         "border_secondary": "magenta",
         "border_task": "#ff00d4",
-        "task_bar_1": "#ff00d4",   # pink
-        "task_bar_2": "#00f0ff",   # ice blue
-        "current_day": "#39ff14",  # bright green
+        "task_bar_1": "#ff00d4",
+        "task_bar_2": "#00f0ff",
+        "current_day": "#39ff14",
         "weekend_fill": "#444444",
         "text": "white",
         "background": "#000000",
@@ -38,9 +39,9 @@ THEMES = {
         "border_primary": "#6fffe9",
         "border_secondary": "#9b5de5",
         "border_task": "#00bbf9",
-        "task_bar_1": "#00bbf9",   # blue
-        "task_bar_2": "#9b5de5",   # purple
-        "current_day": "#39ff14",  # bright green
+        "task_bar_1": "#00bbf9",
+        "task_bar_2": "#9b5de5",
+        "current_day": "#39ff14",
         "weekend_fill": "#3a3a3a",
         "text": "white",
         "background": "#000000",
@@ -50,9 +51,9 @@ THEMES = {
         "border_primary": "#39ff14",
         "border_secondary": "#ffea00",
         "border_task": "#39ff14",
-        "task_bar_1": "#39ff14",   # green
-        "task_bar_2": "#ffea00",   # yellow
-        "current_day": "#ffffff",  # extra contrast
+        "task_bar_1": "#39ff14",
+        "task_bar_2": "#ffea00",
+        "current_day": "#ffffff",
         "weekend_fill": "#444444",
         "text": "white",
         "background": "#000000",
@@ -430,6 +431,95 @@ class AttachFileScreen(ModalScreen[str | None]):
     def on_input_submitted(self, event: Input.Submitted) -> None:
         file_path = event.value.strip()
         self.dismiss(file_path if file_path else None)
+
+
+class AttachmentPickerScreen(ModalScreen[str | None]):
+    CSS = """
+    AttachmentPickerScreen {
+        align: center middle;
+    }
+
+    #dialog {
+        width: 90;
+        height: 22;
+        padding: 1 2;
+        border: round cyan;
+        background: $surface;
+    }
+
+    #dialog_title {
+        content-align: center middle;
+        text-style: bold;
+        height: 1;
+        margin-bottom: 1;
+    }
+
+    #attachment_tree {
+        height: 1fr;
+        border: solid white;
+        margin-bottom: 1;
+    }
+
+    #dialog_buttons {
+        height: auto;
+        align: center middle;
+    }
+
+    Button {
+        margin: 0 1;
+        min-width: 12;
+    }
+    """
+
+    def __init__(self, title: str, attachments: list[str]):
+        super().__init__()
+        self.dialog_title = title
+        self.attachments = attachments
+
+    def compose(self) -> ComposeResult:
+        with Container(id="dialog"):
+            yield Label(self.dialog_title, id="dialog_title")
+            yield Tree("Attachments", id="attachment_tree")
+            with Horizontal(id="dialog_buttons"):
+                yield Button("Select", variant="success", id="select")
+                yield Button("Cancel", id="cancel")
+
+    def on_mount(self) -> None:
+        tree = self.query_one("#attachment_tree", Tree)
+        root = tree.root
+        root.expand()
+
+        for path in self.attachments:
+            filename = os.path.basename(path) or path
+            root.add(filename, data=path)
+
+        if root.children:
+            tree.select_node(root.children[0])
+        tree.focus()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "cancel":
+            self.dismiss(None)
+            return
+
+        self.submit_selection()
+
+    def on_tree_node_selected(self, event: Tree.NodeSelected) -> None:
+        if event.node.data:
+            self.dismiss(event.node.data)
+
+    def submit_selection(self) -> None:
+        tree = self.query_one("#attachment_tree", Tree)
+        node = tree.cursor_node
+
+        if node is None:
+            self.dismiss(None)
+            return
+
+        if isinstance(node.data, str):
+            self.dismiss(node.data)
+        else:
+            self.dismiss(None)
 
 
 class PyGanttApp(App):
@@ -1066,7 +1156,26 @@ class PyGanttApp(App):
             self.notify("This task has no attachments.", severity="warning")
             return
 
-        file_path = attachments[0]
+        if len(attachments) == 1:
+            self.open_file_path(attachments[0])
+            return
+
+        self.push_screen(
+            AttachmentPickerScreen("Open Attachment", attachments),
+            self.handle_open_attachment_selection,
+        )
+
+    def handle_open_attachment_selection(self, file_path: str | None) -> None:
+        if not file_path:
+            self.notify("Open attachment cancelled.")
+            return
+
+        self.open_file_path(file_path)
+
+    def open_file_path(self, file_path: str) -> None:
+        if not os.path.exists(file_path):
+            self.notify(f"File not found: {file_path}", severity="error")
+            return
 
         try:
             if sys.platform.startswith("win"):
@@ -1091,10 +1200,37 @@ class PyGanttApp(App):
             self.notify("This task has no attachments.", severity="warning")
             return
 
-        removed = attachments.pop()
+        if len(attachments) == 1:
+            removed = attachments.pop()
+            save_projects(self.projects)
+            self.refresh_details()
+            self.notify(f"Removed attachment: {removed}")
+            return
+
+        self.push_screen(
+            AttachmentPickerScreen("Remove Attachment", attachments),
+            self.handle_remove_attachment_selection,
+        )
+
+    def handle_remove_attachment_selection(self, file_path: str | None) -> None:
+        if not file_path:
+            self.notify("Remove attachment cancelled.")
+            return
+
+        task = self.get_selected_task()
+        if not task:
+            self.notify("No task selected.", severity="warning")
+            return
+
+        attachments = task.get("attachments", [])
+        if file_path not in attachments:
+            self.notify("Attachment no longer exists.", severity="warning")
+            return
+
+        attachments.remove(file_path)
         save_projects(self.projects)
         self.refresh_details()
-        self.notify(f"Removed attachment: {removed}")
+        self.notify(f"Removed attachment: {file_path}")
 
     def action_previous_gantt_month(self) -> None:
         start_date, end_date = self.get_base_gantt_range()
