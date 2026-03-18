@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, date
 from calendar import monthrange
 from pathlib import Path
 
+from .data import load_projects, save_projects
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical, Container, ScrollableContainer
 from textual.screen import ModalScreen, Screen
