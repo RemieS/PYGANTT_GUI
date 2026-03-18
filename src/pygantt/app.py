@@ -335,7 +335,7 @@ class Banner(Static):
 
         self.update(
             f"[bold {theme['banner']}]{banner}[/]\n"
-            f"[italic{theme['text']}]{subtitle}[/]"
+            f"[italic {theme['text']}]{subtitle}[/]"
         )
 
 
