@@ -6,7 +6,6 @@ from datetime import datetime, timedelta, date
 from calendar import monthrange
 from pathlib import Path
 
-from .data import load_projects, save_projects
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical, Container, ScrollableContainer
 from textual.screen import ModalScreen, Screen
@@ -349,7 +348,8 @@ class ConfirmScreen(ModalScreen[bool]):
         height: 11;
         padding: 1 2;
         border: round red;
-        background: $surface;
+        background: black;
+        color: white;
     }
     #dialog_title {
         text-style: bold;
@@ -1218,24 +1218,19 @@ class PyGanttApp(App):
     CSS = """
 Screen {
     layout: vertical;
-}
-
-#banner {
-    height: auto;
-    padding: 1 2;
-    border: round white;
-    color: white;
-    margin-bottom: 1;
+    background: black;
 }
 
 #main {
     height: 1fr;
     padding: 0 1 1 1;
+    background: black;
 }
 
 #lower-panels {
     height: 1fr;
     align: left top;
+    background: black;
 }
 
 #projects-panel {
@@ -1362,10 +1357,14 @@ Screen {
 
     def apply_theme(self) -> None:
         theme = self.theme_data
+
         self.styles.background = theme["background"]
+        self.screen.styles.background = theme["background"]
 
         for widget_id in [
             "#banner",
+            "#main",
+            "#lower-panels",
             "#projects-panel",
             "#projects",
             "#date-panel",
@@ -1375,9 +1374,12 @@ Screen {
             "#gantt-timeline-scroll",
             "#gantt-timeline",
         ]:
-            widget = self.query_one(widget_id)
-            widget.styles.background = theme["background"]
-            widget.styles.color = theme["text"]
+            try:
+                widget = self.query_one(widget_id)
+                widget.styles.background = theme["background"]
+                widget.styles.color = theme["text"]
+            except Exception:
+                pass
 
         self.query_one("#banner").styles.border = ("round", theme["border_primary"])
         self.query_one("#projects-panel").styles.border = ("solid", theme["border_primary"])
