@@ -330,12 +330,12 @@ class Banner(Static):
 ██║        ██║   ╚██████╔╝██║  ██║██║ ╚████║   ██║      ██║
 ╚═╝        ╚═╝    ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═══╝   ╚═╝      ╚═╝
 """
-        subtitle = "RETRO TERMINAL GANTT / FILES / NOTES / TODO"
+        subtitle = "A Python-based terminal Gantt-chart tool, by Remie Stronks"
         theme = self.app.theme_data
 
         self.update(
             f"[bold {theme['banner']}]{banner}[/]\n"
-            f"[{theme['text']}]{subtitle}[/]"
+            f"[italic{theme['text']}]{subtitle}[/]"
         )
 
 
