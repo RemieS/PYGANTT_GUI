@@ -1,38 +1,29 @@
-import json
 import os
 import re
 import sys
 import subprocess
-from datetime .import datetime, timedelta, date
+from datetime import datetime, timedelta, date
 from calendar import monthrange
 from pathlib import Path
-
-from odf.opendocument import OpenDocumentSpreadsheet
-from odf.table import Table, TableRow, TableCell, TableColumn
-from odf.text import P
-from odf.style import (
-    Style,
-    TableCellProperties,
-    TableColumnProperties,
-    ParagraphProperties,
-    TextProperties,
-)
 
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical, Container, ScrollableContainer
 from textual.screen import ModalScreen
-from textual.widgets import (
-    Header,
-    Footer,
-    Tree,
-    Static,
-    Input,
-    Button,
-    Label,
-    TextArea,
-)
+from textual.widgets import Header, Footer, Tree, Static, Input, Button, Label, TextArea
 
-DATA_FILE = Path("pygantt_data.json")
+from .data import (
+    load_projects,
+    save_projects,
+    add_project,
+    add_task,
+    update_task,
+    delete_project,
+    delete_task,
+    export_projects_to_ods,
+    get_export_project_names,
+    sanitize_filename,
+    ensure_ods_path,
+)
 
 
 THEMES = {
@@ -127,53 +118,6 @@ def shorten_middle(value: str, max_length: int = 64) -> str:
     return f"{value[:left]}...{value[-right:]}"
 
 
-def sanitize_filename(value: str) -> str:
-    value = value.strip()
-    value = re.sub(r'[<>:"/\\|?*]+', "_", value)
-    value = re.sub(r"\s+", "_", value)
-    return value[:120] if value else "pygantt_export"
-
-
-def normalize_hex_color(value: str | None, fallback: str = "#000000") -> str:
-    if not value:
-        return fallback
-
-    value = value.strip()
-
-    named_colors = {
-        "black": "#000000",
-        "white": "#ffffff",
-        "red": "#ff0000",
-        "green": "#008000",
-        "blue": "#0000ff",
-        "yellow": "#ffff00",
-        "magenta": "#ff00ff",
-        "cyan": "#00ffff",
-        "grey": "#808080",
-        "gray": "#808080",
-        "orange": "#ffa500",
-        "purple": "#800080",
-    }
-
-    if value.lower() in named_colors:
-        return named_colors[value.lower()]
-
-    if re.fullmatch(r"#[0-9a-fA-F]{6}", value):
-        return value.lower()
-
-    if re.fullmatch(r"#[0-9a-fA-F]{3}", value):
-        return "#" + "".join(ch * 2 for ch in value[1:]).lower()
-
-    return fallback
-
-
-def ensure_ods_path(file_path: str | Path) -> Path:
-    path = Path(file_path).expanduser()
-    if path.suffix.lower() != ".ods":
-        path = path.with_suffix(".ods")
-    return path
-
-
 def auto_open_file(file_path: str | Path) -> None:
     path = str(file_path)
     try:
@@ -239,367 +183,6 @@ def retro_file_tag(file_path: str) -> str:
     return "[F]"
 
 
-def parse_task(raw: dict) -> dict:
-    start = raw.get("start")
-    end = raw.get("end")
-
-    if isinstance(start, str):
-        start = datetime.strptime(start, "%Y-%m-%d")
-    if isinstance(end, str):
-        end = datetime.strptime(end, "%Y-%m-%d")
-
-    return {
-        "task": raw.get("task", "Untitled Task"),
-        "assignee": raw.get("assignee", ""),
-        "start": start,
-        "end": end,
-        "attachments": list(raw.get("attachments", [])),
-        "notes": raw.get("notes", ""),
-        "todos": [
-            {
-                "text": item.get("text", ""),
-                "done": bool(item.get("done", False)),
-            }
-            for item in raw.get("todos", [])
-        ],
-    }
-
-
-def serialize_task(task: dict) -> dict:
-    return {
-        "task": task["task"],
-        "assignee": task["assignee"],
-        "start": task["start"].strftime("%Y-%m-%d"),
-        "end": task["end"].strftime("%Y-%m-%d"),
-        "attachments": task.get("attachments", []),
-        "notes": task.get("notes", ""),
-        "todos": task.get("todos", []),
-    }
-
-
-def load_projects() -> dict[str, list[dict]]:
-    if not DATA_FILE.exists():
-        return {}
-
-    try:
-        data = json.loads(DATA_FILE.read_text(encoding="utf-8"))
-    except Exception:
-        return {}
-
-    projects: dict[str, list[dict]] = {}
-    raw_projects = data.get("projects", {})
-
-    for project_name, task_list in raw_projects.items():
-        projects[project_name] = [parse_task(task) for task in task_list]
-
-    return projects
-
-
-def save_projects(projects: dict[str, list[dict]]) -> None:
-    data = {
-        "projects": {
-            project_name: [serialize_task(task) for task in tasks]
-            for project_name, tasks in projects.items()
-        }
-    }
-    DATA_FILE.write_text(json.dumps(data, indent=2), encoding="utf-8")
-
-
-def add_project(projects: dict[str, list[dict]], project_name: str) -> bool:
-    project_name = project_name.strip()
-    if not project_name or project_name in projects:
-        return False
-    projects[project_name] = []
-    return True
-
-
-def delete_project(projects: dict[str, list[dict]], project_name: str) -> bool:
-    if project_name not in projects:
-        return False
-    del projects[project_name]
-    return True
-
-
-def add_task(
-    projects: dict[str, list[dict]],
-    project_name: str,
-    task_name: str,
-    assignee: str,
-    start: datetime,
-    end: datetime,
-) -> bool:
-    if project_name not in projects:
-        return False
-
-    projects[project_name].append(
-        {
-            "task": task_name,
-            "assignee": assignee,
-            "start": start,
-            "end": end,
-            "attachments": [],
-            "notes": "",
-            "todos": [],
-        }
-    )
-    return True
-
-
-def update_task(
-    projects: dict[str, list[dict]],
-    project_name: str,
-    task_index: int,
-    task_name: str,
-    assignee: str,
-    start: datetime,
-    end: datetime,
-) -> bool:
-    if project_name not in projects:
-        return False
-
-    tasks = projects[project_name]
-    if not (0 <= task_index < len(tasks)):
-        return False
-
-    existing = tasks[task_index]
-    tasks[task_index] = {
-        "task": task_name,
-        "assignee": assignee,
-        "start": start,
-        "end": end,
-        "attachments": existing.get("attachments", []),
-        "notes": existing.get("notes", ""),
-        "todos": existing.get("todos", []),
-    }
-    return True
-
-
-def delete_task(projects: dict[str, list[dict]], project_name: str, task_index: int) -> bool:
-    if project_name not in projects:
-        return False
-
-    tasks = projects[project_name]
-    if not (0 <= task_index < len(tasks)):
-        return False
-
-    del tasks[task_index]
-    if not tasks:
-        del projects[project_name]
-    return True
-
-
-def get_export_project_names(
-    projects: dict[str, list[dict]],
-    selected_project: str | None,
-    selected_projects: set[str],
-) -> list[str]:
-    if selected_projects:
-        return [name for name in sorted(selected_projects) if name in projects]
-    if selected_project and selected_project in projects:
-        return [selected_project]
-    return sorted(projects.keys())
-
-
-def get_export_date_range(
-    projects: dict[str, list[dict]],
-    project_names: list[str],
-) -> tuple[date, date] | None:
-    task_dates: list[tuple[date, date]] = []
-
-    for project_name in project_names:
-        for task in projects.get(project_name, []):
-            task_dates.append((task["start"].date(), task["end"].date()))
-
-    if not task_dates:
-        return None
-
-    start_date = min(item[0] for item in task_dates)
-    end_date = max(item[1] for item in task_dates)
-    return start_date, end_date
-
-
-def export_projects_to_ods(
-    projects: dict[str, list[dict]],
-    project_names: list[str],
-    output_path: Path,
-    theme: dict,
-) -> Path:
-    if not project_names:
-        raise ValueError("No projects selected.")
-
-    date_range = get_export_date_range(projects, project_names)
-    if not date_range:
-        raise ValueError("No tasks found.")
-
-    start_date, end_date = date_range
-
-    dates = []
-    current = start_date
-    while current <= end_date:
-        dates.append(current)
-        current += timedelta(days=1)
-
-    doc = OpenDocumentSpreadsheet()
-
-    def make_cell_style(name: str, bg: str | None = None) -> Style:
-        style = Style(name=name, family="table-cell")
-        props = {
-            "border": "0.02cm solid #888888",
-            "verticalalign": "middle",
-        }
-        if bg:
-            props["backgroundcolor"] = normalize_hex_color(bg)
-        style.addElement(TableCellProperties(**props))
-        doc.automaticstyles.addElement(style)
-        return style
-
-    def make_col_style(name: str, width: str) -> Style:
-        style = Style(name=name, family="table-column")
-        style.addElement(TableColumnProperties(columnwidth=width))
-        doc.automaticstyles.addElement(style)
-        return style
-
-    def make_para_style(
-        name: str,
-        align: str = "left",
-        bold: bool = False,
-        color: str | None = None,
-    ) -> Style:
-        style = Style(name=name, family="paragraph")
-        style.addElement(ParagraphProperties(textalign=align))
-        text_args = {}
-        if bold:
-            text_args["fontweight"] = "bold"
-        if color:
-            text_args["color"] = normalize_hex_color(color, "#000000")
-        if text_args:
-            style.addElement(TextProperties(**text_args))
-        doc.automaticstyles.addElement(style)
-        return style
-
-    header_bg = normalize_hex_color(theme.get("border_primary", "#1f4e78"), "#1f4e78")
-    project_bg = normalize_hex_color(theme.get("border_secondary", "#d9eaf7"), "#d9eaf7")
-    task_bg_1 = normalize_hex_color(theme.get("task_bar_1", "#a9d18e"), "#a9d18e")
-    task_bg_2 = normalize_hex_color(theme.get("task_bar_2", "#9fd5ff"), "#9fd5ff")
-    today_bg = normalize_hex_color(theme.get("current_day", "#ffd966"), "#ffd966")
-    weekend_bg = "#eeeeee"
-    text_color = normalize_hex_color(theme.get("text", "#000000"), "#000000")
-
-    cell_default = make_cell_style("cell_default")
-    cell_header = make_cell_style("cell_header", header_bg)
-    cell_project = make_cell_style("cell_project", project_bg)
-    cell_weekend = make_cell_style("cell_weekend", weekend_bg)
-    cell_today = make_cell_style("cell_today", today_bg)
-    cell_task_1 = make_cell_style("cell_task_1", task_bg_1)
-    cell_task_2 = make_cell_style("cell_task_2", task_bg_2)
-
-    col_project = make_col_style("col_project", "4.5cm")
-    col_task = make_col_style("col_task", "4.5cm")
-    col_assignee = make_col_style("col_assignee", "3.5cm")
-    col_date = make_col_style("col_date", "1.3cm")
-
-    para_left = make_para_style("para_left", "left", False, text_color)
-    para_center = make_para_style("para_center", "center", False, text_color)
-    para_header = make_para_style("para_header", "center", True, "#ffffff")
-    para_project = make_para_style("para_project", "left", True, text_color)
-
-    table = Table(name="Projects")
-
-    table.addElement(TableColumn(stylename=col_project))
-    table.addElement(TableColumn(stylename=col_task))
-    table.addElement(TableColumn(stylename=col_assignee))
-    for _ in dates:
-        table.addElement(TableColumn(stylename=col_date))
-
-    week_row = TableRow()
-    for _ in range(3):
-        cell = TableCell(stylename=cell_header)
-        cell.addElement(P(stylename=para_header, text=""))
-        week_row.addElement(cell)
-
-    for d in dates:
-        cell = TableCell(stylename=cell_header)
-        cell.addElement(P(stylename=para_header, text=f"W{d.isocalendar().week:02d}"))
-        week_row.addElement(cell)
-    table.addElement(week_row)
-
-    header_row = TableRow()
-    for title in ["Project", "Task", "Assignee"]:
-        cell = TableCell(stylename=cell_header)
-        cell.addElement(P(stylename=para_header, text=title))
-        header_row.addElement(cell)
-
-    for d in dates:
-        cell = TableCell(stylename=cell_header)
-        cell.addElement(P(stylename=para_header, text=d.strftime("%Y-%m-%d")))
-        header_row.addElement(cell)
-    table.addElement(header_row)
-
-    today = datetime.now().date()
-
-    for project_name in project_names:
-        tasks = projects.get(project_name, [])
-
-        project_row = TableRow()
-
-        c = TableCell(stylename=cell_project)
-        c.addElement(P(stylename=para_project, text=project_name))
-        project_row.addElement(c)
-
-        for _ in range(2):
-            c = TableCell(stylename=cell_project)
-            c.addElement(P(stylename=para_center, text=""))
-            project_row.addElement(c)
-
-        for d in dates:
-            style = cell_today if d == today else cell_project
-            c = TableCell(stylename=style)
-            c.addElement(P(stylename=para_center, text=""))
-            project_row.addElement(c)
-
-        table.addElement(project_row)
-
-        for task_index, task in enumerate(tasks):
-            row = TableRow()
-
-            c = TableCell(stylename=cell_default)
-            c.addElement(P(stylename=para_left, text=""))
-            row.addElement(c)
-
-            c = TableCell(stylename=cell_default)
-            c.addElement(P(stylename=para_left, text=task["task"]))
-            row.addElement(c)
-
-            c = TableCell(stylename=cell_default)
-            c.addElement(P(stylename=para_left, text=task["assignee"]))
-            row.addElement(c)
-
-            active_style = cell_task_1 if task_index % 2 == 0 else cell_task_2
-            task_start = task["start"].date()
-            task_end = task["end"].date()
-
-            for d in dates:
-                if task_start <= d <= task_end:
-                    style = cell_today if d == today else active_style
-                elif d == today:
-                    style = cell_today
-                elif d.weekday() >= 5:
-                    style = cell_weekend
-                else:
-                    style = cell_default
-
-                c = TableCell(stylename=style)
-                c.addElement(P(stylename=para_center, text=""))
-                row.addElement(c)
-
-            table.addElement(row)
-
-    doc.spreadsheet.addElement(table)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    doc.save(str(output_path))
-    return output_path
-
-
 class Banner(Static):
     def on_mount(self) -> None:
         self.refresh_banner()
@@ -615,7 +198,6 @@ class Banner(Static):
     """
         subtitle = "    A Python-based terminal Gantt-chart tool, by Remie Stronks"
         theme = self.app.theme_data
-
         self.update(
             f"[bold {theme['banner']}]{banner}[/]\n"
             f"[italic {theme['text']}]{subtitle}[/]"
@@ -658,13 +240,13 @@ class ConfirmScreen(ModalScreen[bool]):
 
     def __init__(self, title: str, message: str):
         super().__init__()
-        self.title = title
-        self.message = message
+        self.title_text = title
+        self.message_text = message
 
     def compose(self) -> ComposeResult:
         with Container(id="dialog"):
-            yield Label(self.title, id="dialog_title")
-            yield Label(self.message, id="dialog_message")
+            yield Label(self.title_text, id="dialog_title")
+            yield Label(self.message_text, id="dialog_message")
             with Horizontal(id="dialog_buttons"):
                 yield Button("YES", variant="error", id="confirm")
                 yield Button("NO", id="cancel")
@@ -704,9 +286,7 @@ class AddProjectScreen(ModalScreen[str | None]):
     }
     """
 
-    BINDINGS = [
-        ("escape", "cancel_dialog", "CANCEL"),
-    ]
+    BINDINGS = [("escape", "cancel_dialog", "CANCEL")]
 
     def compose(self) -> ComposeResult:
         with Container(id="dialog"):
@@ -765,9 +345,7 @@ class TaskEditorScreen(ModalScreen[dict | None]):
     }
     """
 
-    BINDINGS = [
-        ("escape", "cancel_dialog", "CANCEL"),
-    ]
+    BINDINGS = [("escape", "cancel_dialog", "CANCEL")]
 
     def __init__(self, title: str = "ADD TASK", task_data: dict | None = None):
         super().__init__()
@@ -777,26 +355,10 @@ class TaskEditorScreen(ModalScreen[dict | None]):
     def compose(self) -> ComposeResult:
         with Container(id="dialog"):
             yield Label(self.dialog_title, id="dialog_title")
-            yield Input(
-                value=self.task_data.get("task", ""),
-                placeholder="TASK NAME",
-                id="task_name_input",
-            )
-            yield Input(
-                value=self.task_data.get("assignee", ""),
-                placeholder="ASSIGNEE",
-                id="assignee_input",
-            )
-            yield Input(
-                value=self.task_data.get("start", ""),
-                placeholder="START DATE (YYYY-MM-DD)",
-                id="start_input",
-            )
-            yield Input(
-                value=self.task_data.get("end", ""),
-                placeholder="END DATE (YYYY-MM-DD)",
-                id="end_input",
-            )
+            yield Input(value=self.task_data.get("task", ""), placeholder="TASK NAME", id="task_name_input")
+            yield Input(value=self.task_data.get("assignee", ""), placeholder="ASSIGNEE", id="assignee_input")
+            yield Input(value=self.task_data.get("start", ""), placeholder="START DATE (YYYY-MM-DD)", id="start_input")
+            yield Input(value=self.task_data.get("end", ""), placeholder="END DATE (YYYY-MM-DD)", id="end_input")
             with Horizontal(id="dialog_buttons"):
                 yield Button("SAVE", variant="success", id="save")
                 yield Button("CANCEL", id="cancel")
@@ -891,9 +453,7 @@ class ExportScreen(ModalScreen[str | None]):
     }
     """
 
-    BINDINGS = [
-        ("escape", "cancel_dialog", "CANCEL"),
-    ]
+    BINDINGS = [("escape", "cancel_dialog", "CANCEL")]
 
     def __init__(self, suggested_path: str):
         super().__init__()
@@ -918,7 +478,6 @@ class ExportScreen(ModalScreen[str | None]):
         if event.button.id == "cancel":
             self.dismiss(None)
             return
-
         file_path = self.query_one("#file_path_input", Input).value.strip()
         self.dismiss(file_path if file_path else None)
 
@@ -1158,7 +717,6 @@ class FileBrowserScreen(ModalScreen[str | None]):
             self.current_path = os.path.abspath(start_path)
         else:
             self.current_path = os.path.expanduser("~")
-
         self.show_hidden = False
         self.file_filter = "all"
 
@@ -1182,7 +740,6 @@ class FileBrowserScreen(ModalScreen[str | None]):
 
     def matches_filter(self, filename: str) -> bool:
         ext = os.path.splitext(filename)[1].lower()
-
         filter_groups = {
             "all": set(),
             "text": {".txt", ".md", ".rtf"},
@@ -1195,9 +752,7 @@ class FileBrowserScreen(ModalScreen[str | None]):
 
         if self.file_filter == "all":
             return True
-
-        allowed = filter_groups.get(self.file_filter, set())
-        return ext in allowed
+        return ext in filter_groups.get(self.file_filter, set())
 
     def refresh_browser(self) -> None:
         path_label = self.query_one("#current_path", Static)
@@ -1205,9 +760,7 @@ class FileBrowserScreen(ModalScreen[str | None]):
         hidden_text = "ON" if self.show_hidden else "OFF"
 
         path_label.update(f"[b]PATH :[/b] {shorten_middle(self.current_path, 96)}")
-        filter_label.update(
-            f"[b]HIDDEN :[/b] {hidden_text}    [b]FILTER :[/b] {self.file_filter.upper()}"
-        )
+        filter_label.update(f"[b]HIDDEN :[/b] {hidden_text}    [b]FILTER :[/b] {self.file_filter.upper()}")
 
         tree = self.query_one("#browser_tree", Tree)
         root = tree.root
@@ -1232,7 +785,6 @@ class FileBrowserScreen(ModalScreen[str | None]):
         for entry in entries:
             try:
                 name = entry.name
-
                 if not self.show_hidden and name.startswith("."):
                     continue
 
@@ -1241,10 +793,7 @@ class FileBrowserScreen(ModalScreen[str | None]):
                 else:
                     if not self.matches_filter(name):
                         continue
-                    root.add(
-                        f"{retro_file_tag(entry.path)} {name}",
-                        data={"type": "file", "path": entry.path},
-                    )
+                    root.add(f"{retro_file_tag(entry.path)} {name}", data={"type": "file", "path": entry.path})
             except (PermissionError, OSError):
                 continue
 
@@ -1253,11 +802,8 @@ class FileBrowserScreen(ModalScreen[str | None]):
 
     def cycle_filter(self) -> None:
         filters = ["all", "text", "pdf", "images", "writer", "calc", "impress"]
-        try:
-            index = filters.index(self.file_filter)
-        except ValueError:
-            index = 0
-        self.file_filter = filters[(index + 1) % len(filters)]
+        current_index = filters.index(self.file_filter)
+        self.file_filter = filters[(current_index + 1) % len(filters)]
         self.refresh_browser()
         self.app.notify(f"FILTER = {self.file_filter.upper()}")
 
@@ -1296,12 +842,15 @@ class FileBrowserScreen(ModalScreen[str | None]):
         if event.button.id == "cancel":
             self.dismiss(None)
             return
+
         if event.button.id == "up":
             self.action_go_up()
             return
+
         if event.button.id == "toggle_hidden":
             self.action_toggle_hidden()
             return
+
         if event.button.id == "change_filter":
             self.cycle_filter()
             return
@@ -1327,9 +876,6 @@ class FileBrowserScreen(ModalScreen[str | None]):
                 self.dismiss(path)
             else:
                 self.app.notify("SELECT A FILE", severity="warning")
-
-    def on_tree_node_selected(self, event: Tree.NodeSelected) -> None:
-        pass
 
 
 class TaskWorkspaceScreen(ModalScreen[dict | None]):
@@ -1474,10 +1020,7 @@ class TaskWorkspaceScreen(ModalScreen[dict | None]):
 
                 with Vertical(id="right_pane"):
                     yield Static("TASK NOTES / TEXT", id="notes_header")
-                    yield Static(
-                        "WRITE OR EDIT TEXT HERE. USE CTRL+S OR SAVE.",
-                        id="notes_help",
-                    )
+                    yield Static("WRITE OR EDIT TEXT HERE. USE CTRL+S OR SAVE.", id="notes_help")
                     yield TextArea(id="notes_area")
 
             with Horizontal(id="workspace_buttons"):
@@ -1587,83 +1130,80 @@ class TaskWorkspaceScreen(ModalScreen[dict | None]):
         elif event.button.id == "delete_todo":
             self.action_delete_todo()
 
-    def on_tree_node_selected(self, event: Tree.NodeSelected) -> None:
-        pass
-
 
 class PyGanttApp(App):
     CSS = """
-Screen {
-    layout: vertical;
-    background: black;
-}
+    Screen {
+        layout: vertical;
+        background: black;
+    }
 
-#main {
-    height: 1fr;
-    padding: 0 1 1 1;
-    background: black;
-}
+    #main {
+        height: 1fr;
+        padding: 0 1 1 1;
+        background: black;
+    }
 
-#lower-panels {
-    height: 1fr;
-    align: left top;
-    background: black;
-}
+    #lower-panels {
+        height: 1fr;
+        align: left top;
+        background: black;
+    }
 
-#projects-panel {
-    width: 34;
-    min-width: 28;
-    height: 1fr;
-    border: solid white;
-    margin-right: 1;
-}
+    #projects-panel {
+        width: 34;
+        min-width: 28;
+        height: 1fr;
+        border: solid white;
+        margin-right: 1;
+    }
 
-#projects {
-    height: 1fr;
-    border: none;
-}
+    #projects {
+        height: 1fr;
+        border: none;
+    }
 
-#date-panel {
-    width: 24;
-    min-width: 20;
-    height: 1fr;
-    border: solid magenta;
-    margin-right: 1;
-}
+    #date-panel {
+        width: 24;
+        min-width: 20;
+        height: 1fr;
+        border: solid magenta;
+        margin-right: 1;
+    }
 
-#date-labels-scroll {
-    height: 1fr;
-    overflow-x: hidden;
-    overflow-y: auto;
-    border: none;
-}
+    #date-labels-scroll {
+        height: 1fr;
+        overflow-x: hidden;
+        overflow-y: auto;
+        border: none;
+    }
 
-#date-labels {
-    width: 22;
-    padding: 1;
-}
+    #date-labels {
+        width: 22;
+        padding: 1;
+    }
 
-#timeline-panel {
-    width: 1fr;
-    min-width: 80;
-    height: 1fr;
-    border: solid cyan;
-}
+    #timeline-panel {
+        width: 1fr;
+        min-width: 80;
+        height: 1fr;
+        border: solid cyan;
+    }
 
-#gantt-timeline-scroll {
-    width: 1fr;
-    height: 1fr;
-    overflow-x: auto;
-    overflow-y: auto;
-    border: none;
-}
+    #gantt-timeline-scroll {
+        width: 1fr;
+        height: 1fr;
+        overflow-x: auto;
+        overflow-y: auto;
+        border: none;
+    }
 
-#gantt-timeline {
-    width: auto;
-    height: auto;
-    padding: 1;
-}
-"""
+    #gantt-timeline {
+        width: auto;
+        height: auto;
+        padding: 1;
+    }
+    """
 
     BINDINGS = [
         ("q", "quit", "QUIT"),
@@ -1672,8 +1212,6 @@ Screen {
         ("e", "edit_selected", "EDIT"),
         ("d", "delete_selected", "DELETE"),
         ("enter", "open_workspace", "TASK WORKSPACE"),
-        ("T", "open_task_view", "OPEN TASK"),
-        ("tilde", "open_notes", "OPEN NOTES"),
         ("space", "toggle_project_selection", "TOGGLE PROJECT"),
         ("[", "previous_gantt_month", "PREV VIEW"),
         ("]", "next_gantt_month", "NEXT VIEW"),
@@ -1695,7 +1233,7 @@ Screen {
         self.last_browsed_path = os.path.expanduser("~")
 
         self.theme_names = list(THEMES.keys())
-        self.theme_name = "retro_neon"
+        self.theme_name = "ice_neon"
         self.theme_data = THEMES[self.theme_name]
 
         for project_tasks in self.projects.values():
@@ -1765,7 +1303,6 @@ Screen {
         self.query_one("#timeline-panel").styles.border = ("solid", theme["border_primary"])
 
         self.query_one("#banner", Banner).refresh_banner()
-        self.refresh_gantt_view()
 
     def refresh_project_tree(self) -> None:
         tree = self.query_one("#projects", Tree)
@@ -1811,6 +1348,42 @@ Screen {
         if self.selected_project:
             return [self.selected_project]
         return []
+
+    def get_base_gantt_range(self) -> tuple[date, date]:
+        today = datetime.now().date()
+        selected_rows = []
+
+        for project_name in self.get_selected_projects_for_gantt():
+            for task in self.projects.get(project_name, []):
+                selected_rows.append(task)
+
+        if selected_rows:
+            first_day = min(task["start"].date() for task in selected_rows)
+        else:
+            first_day = today
+
+        start = first_day.replace(day=1)
+
+        months_visible = 4
+        end_year = start.year
+        end_month = start.month
+
+        for _ in range(months_visible - 1):
+            if end_month == 12:
+                end_month = 1
+                end_year += 1
+            else:
+                end_month += 1
+
+        end = date(end_year, end_month, monthrange(end_year, end_month)[1])
+        return start, end
+
+    def get_gantt_visible_range(self) -> tuple[date, date]:
+        start, end = self.get_base_gantt_range()
+        if self.gantt_day_offset == 0:
+            return start, end
+        shift = timedelta(days=self.gantt_day_offset)
+        return start + shift, end + shift
 
     def refresh_gantt_view(self) -> None:
         labels = self.query_one("#date-labels", Static)
@@ -1990,7 +1563,7 @@ Screen {
             self.notify("TASK CANCELLED")
             return
 
-        add_task(
+        ok = add_task(
             self.projects,
             self.selected_project,
             task_data["task"],
@@ -1998,6 +1571,11 @@ Screen {
             task_data["start"],
             task_data["end"],
         )
+
+        if not ok:
+            self.notify("ADD TASK FAILED", severity="warning")
+            return
+
         save_projects(self.projects)
         self.refresh_project_tree()
         self.refresh_gantt_view()
@@ -2029,7 +1607,7 @@ Screen {
             self.notify("NO TASK SELECTED", severity="warning")
             return
 
-        if not update_task(
+        ok = update_task(
             self.projects,
             self.selected_project,
             self.selected_task_index,
@@ -2037,7 +1615,9 @@ Screen {
             task_data["assignee"],
             task_data["start"],
             task_data["end"],
-        ):
+        )
+
+        if not ok:
             self.notify("UPDATE FAILED", severity="warning")
             return
 
@@ -2133,12 +1713,6 @@ Screen {
         self.push_screen(workspace, self.handle_workspace_result)
 
     def action_open_workspace(self) -> None:
-        self.open_workspace_with_focus("notes")
-
-    def action_open_task_view(self) -> None:
-        self.open_workspace_with_focus("notes")
-
-    def action_open_notes(self) -> None:
         self.open_workspace_with_focus("notes")
 
     def handle_workspace_result(self, result: dict | None) -> None:
@@ -2328,6 +1902,8 @@ Screen {
         self.theme_name = self.theme_names[next_index]
         self.theme_data = THEMES[self.theme_name]
         self.apply_theme()
+        self.refresh_project_tree()
+        self.refresh_gantt_view()
         self.notify(f"THEME = {self.theme_name.upper()}")
 
     def action_toggle_project_selection(self) -> None:
@@ -2386,56 +1962,16 @@ Screen {
 
         try:
             output_path = ensure_ods_path(file_path)
-
             saved_path = export_projects_to_ods(
                 self.projects,
                 export_names,
                 output_path,
                 self.theme_data,
             )
-
             self.notify(f"EXPORTED: {saved_path}")
             auto_open_file(saved_path)
-
         except Exception as exc:
             self.notify(f"EXPORT FAILED: {exc}", severity="error")
-
-    def get_base_gantt_range(self) -> tuple[date, date]:
-        today = datetime.now().date()
-        selected_rows = []
-        selected = self.get_selected_projects_for_gantt()
-
-        for project_name in selected:
-            for task in self.projects.get(project_name, []):
-                selected_rows.append(task)
-
-        if selected_rows:
-            first_day = min(task["start"].date() for task in selected_rows)
-        else:
-            first_day = today
-
-        start = first_day.replace(day=1)
-
-        months_visible = 4
-        end_year = start.year
-        end_month = start.month
-
-        for _ in range(months_visible - 1):
-            if end_month == 12:
-                end_month = 1
-                end_year += 1
-            else:
-                end_month += 1
-
-        end = date(end_year, end_month, monthrange(end_year, end_month)[1])
-        return start, end
-
-    def get_gantt_visible_range(self) -> tuple[date, date]:
-        start, end = self.get_base_gantt_range()
-        if self.gantt_day_offset == 0:
-            return start, end
-        shift = timedelta(days=self.gantt_day_offset)
-        return start + shift, end + shift
 
 
 def main() -> None:
