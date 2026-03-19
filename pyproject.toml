@@ -1,29 +1,28 @@
 [build-system]
-requires = ["setuptools>=80", "wheel"]
+requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "pygantt"
+name = "pygantt-retro"
 version = "0.1.0"
-description = "A retro Gantt chart tool built with Textual"
+description = "A retro terminal Gantt chart tool built with Python and Textual"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.11"
+license = { text = "MIT" }
 authors = [
   { name = "Remie Stronks" }
 ]
-license = { text = "MIT" }
 dependencies = [
-  "textual>=0.60"
+  "textual[syntax]>=0.58.0",
+  "odfpy>=1.4.1"
 ]
 
-[project.scripts]
-pyganttgui = "pygantt.app:main"
+[project.urls]
+Homepage = "https://github.com/RemieS/PYGANTT_GUI"
+Issues = "https://github.com/RemieS/PYGANTT_GUI/issues"
 
 [tool.setuptools]
-package-dir = {"" = "src"}
+py-modules = ["pygantt"]
 
-[tool.setuptools.packages.find]
-where = ["src"]
-
-[tool.setuptools.package-data]
-pygantt = ["assets/*"]
+[project.scripts]
+pygantt = "pygantt:main"
