@@ -9,12 +9,10 @@ description = "A retro terminal Gantt chart tool built with Python and Textual"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
-authors = [
-  { name = "Remie Stronks" }
-]
+authors = [{ name = "Remie Stronks" }]
 dependencies = [
-  "textual[syntax]>=0.58.0",
-  "odfpy>=1.4.1"
+    "textual[syntax]>=0.58.0",
+    "odfpy>=1.4.1",
 ]
 
 [project.urls]
@@ -22,7 +20,7 @@ Homepage = "https://github.com/RemieS/PYGANTT_GUI"
 Issues = "https://github.com/RemieS/PYGANTT_GUI/issues"
 
 [tool.setuptools]
-py-modules = ["pyganttgui"]
+py-modules = ["pygantt", "data"]
 
 [project.scripts]
-pyganttgui = "pyganttgui:main"
+pygantt = "pygantt:main"
