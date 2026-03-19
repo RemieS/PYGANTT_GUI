@@ -1248,7 +1248,7 @@ Screen {
 }
 
 #date-panel {
-    width: 32;
+    width: 60;
     min-width: 20;
     height: 1fr;
     border: solid magenta;
