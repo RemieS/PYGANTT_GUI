@@ -1,15 +1,26 @@
 import json
 import os
+import re
 import sys
 import subprocess
 from datetime import datetime, timedelta, date
 from calendar import monthrange
 from pathlib import Path
 
-from .data import load_projects, save_projects
+from odf.opendocument import OpenDocumentSpreadsheet
+from odf.table import Table, TableRow, TableCell, TableColumn
+from odf.text import P
+from odf.style import (
+    Style,
+    TableCellProperties,
+    TableColumnProperties,
+    ParagraphProperties,
+    TextProperties,
+)
+
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical, Container, ScrollableContainer
-from textual.screen import ModalScreen, Screen
+from textual.screen import ModalScreen
 from textual.widgets import (
     Header,
     Footer,
@@ -114,6 +125,66 @@ def shorten_middle(value: str, max_length: int = 64) -> str:
     left = (max_length - 3) // 2
     right = max_length - 3 - left
     return f"{value[:left]}...{value[-right:]}"
+
+
+def sanitize_filename(value: str) -> str:
+    value = value.strip()
+    value = re.sub(r'[<>:"/\\|?*]+', "_", value)
+    value = re.sub(r"\s+", "_", value)
+    return value[:120] if value else "pygantt_export"
+
+
+def normalize_hex_color(value: str | None, fallback: str = "#000000") -> str:
+    if not value:
+        return fallback
+
+    value = value.strip()
+
+    named_colors = {
+        "black": "#000000",
+        "white": "#ffffff",
+        "red": "#ff0000",
+        "green": "#008000",
+        "blue": "#0000ff",
+        "yellow": "#ffff00",
+        "magenta": "#ff00ff",
+        "cyan": "#00ffff",
+        "grey": "#808080",
+        "gray": "#808080",
+        "orange": "#ffa500",
+        "purple": "#800080",
+    }
+
+    if value.lower() in named_colors:
+        return named_colors[value.lower()]
+
+    if re.fullmatch(r"#[0-9a-fA-F]{6}", value):
+        return value.lower()
+
+    if re.fullmatch(r"#[0-9a-fA-F]{3}", value):
+        return "#" + "".join(ch * 2 for ch in value[1:]).lower()
+
+    return fallback
+
+
+def ensure_ods_path(file_path: str | Path) -> Path:
+    path = Path(file_path).expanduser()
+    if path.suffix.lower() != ".ods":
+        path = path.with_suffix(".ods")
+    return path
+
+
+def auto_open_file(file_path: str | Path) -> None:
+    path = str(file_path)
+    try:
+        if sys.platform.startswith("win"):
+            os.startfile(path)
+        elif sys.platform == "darwin":
+            subprocess.run(["open", path], check=False)
+        else:
+            subprocess.run(["xdg-open", path], check=False)
+    except Exception:
+        pass
 
 
 def task_status_label(task: dict) -> str:
@@ -317,6 +388,218 @@ def delete_task(projects: dict[str, list[dict]], project_name: str, task_index: 
     return True
 
 
+def get_export_project_names(
+    projects: dict[str, list[dict]],
+    selected_project: str | None,
+    selected_projects: set[str],
+) -> list[str]:
+    if selected_projects:
+        return [name for name in sorted(selected_projects) if name in projects]
+    if selected_project and selected_project in projects:
+        return [selected_project]
+    return sorted(projects.keys())
+
+
+def get_export_date_range(
+    projects: dict[str, list[dict]],
+    project_names: list[str],
+) -> tuple[date, date] | None:
+    task_dates: list[tuple[date, date]] = []
+
+    for project_name in project_names:
+        for task in projects.get(project_name, []):
+            task_dates.append((task["start"].date(), task["end"].date()))
+
+    if not task_dates:
+        return None
+
+    start_date = min(item[0] for item in task_dates)
+    end_date = max(item[1] for item in task_dates)
+    return start_date, end_date
+
+
+def export_projects_to_ods(
+    projects: dict[str, list[dict]],
+    project_names: list[str],
+    output_path: Path,
+    theme: dict,
+) -> Path:
+    if not project_names:
+        raise ValueError("No projects selected.")
+
+    date_range = get_export_date_range(projects, project_names)
+    if not date_range:
+        raise ValueError("No tasks found.")
+
+    start_date, end_date = date_range
+
+    dates = []
+    current = start_date
+    while current <= end_date:
+        dates.append(current)
+        current += timedelta(days=1)
+
+    doc = OpenDocumentSpreadsheet()
+
+    def make_cell_style(name: str, bg: str | None = None) -> Style:
+        style = Style(name=name, family="table-cell")
+        props = {
+            "border": "0.02cm solid #888888",
+            "verticalalign": "middle",
+        }
+        if bg:
+            props["backgroundcolor"] = normalize_hex_color(bg)
+        style.addElement(TableCellProperties(**props))
+        doc.automaticstyles.addElement(style)
+        return style
+
+    def make_col_style(name: str, width: str) -> Style:
+        style = Style(name=name, family="table-column")
+        style.addElement(TableColumnProperties(columnwidth=width))
+        doc.automaticstyles.addElement(style)
+        return style
+
+    def make_para_style(
+        name: str,
+        align: str = "left",
+        bold: bool = False,
+        color: str | None = None,
+    ) -> Style:
+        style = Style(name=name, family="paragraph")
+        style.addElement(ParagraphProperties(textalign=align))
+        text_args = {}
+        if bold:
+            text_args["fontweight"] = "bold"
+        if color:
+            text_args["color"] = normalize_hex_color(color, "#000000")
+        if text_args:
+            style.addElement(TextProperties(**text_args))
+        doc.automaticstyles.addElement(style)
+        return style
+
+    header_bg = normalize_hex_color(theme.get("border_primary", "#1f4e78"), "#1f4e78")
+    project_bg = normalize_hex_color(theme.get("border_secondary", "#d9eaf7"), "#d9eaf7")
+    task_bg_1 = normalize_hex_color(theme.get("task_bar_1", "#a9d18e"), "#a9d18e")
+    task_bg_2 = normalize_hex_color(theme.get("task_bar_2", "#9fd5ff"), "#9fd5ff")
+    today_bg = normalize_hex_color(theme.get("current_day", "#ffd966"), "#ffd966")
+    weekend_bg = "#eeeeee"
+    text_color = normalize_hex_color(theme.get("text", "#000000"), "#000000")
+
+    cell_default = make_cell_style("cell_default")
+    cell_header = make_cell_style("cell_header", header_bg)
+    cell_project = make_cell_style("cell_project", project_bg)
+    cell_weekend = make_cell_style("cell_weekend", weekend_bg)
+    cell_today = make_cell_style("cell_today", today_bg)
+    cell_task_1 = make_cell_style("cell_task_1", task_bg_1)
+    cell_task_2 = make_cell_style("cell_task_2", task_bg_2)
+
+    col_project = make_col_style("col_project", "4.5cm")
+    col_task = make_col_style("col_task", "4.5cm")
+    col_assignee = make_col_style("col_assignee", "3.5cm")
+    col_date = make_col_style("col_date", "1.3cm")
+
+    para_left = make_para_style("para_left", "left", False, text_color)
+    para_center = make_para_style("para_center", "center", False, text_color)
+    para_header = make_para_style("para_header", "center", True, "#ffffff")
+    para_project = make_para_style("para_project", "left", True, text_color)
+
+    table = Table(name="Projects")
+
+    table.addElement(TableColumn(stylename=col_project))
+    table.addElement(TableColumn(stylename=col_task))
+    table.addElement(TableColumn(stylename=col_assignee))
+    for _ in dates:
+        table.addElement(TableColumn(stylename=col_date))
+
+    week_row = TableRow()
+    for _ in range(3):
+        cell = TableCell(stylename=cell_header)
+        cell.addElement(P(stylename=para_header, text=""))
+        week_row.addElement(cell)
+
+    for d in dates:
+        cell = TableCell(stylename=cell_header)
+        cell.addElement(P(stylename=para_header, text=f"W{d.isocalendar().week:02d}"))
+        week_row.addElement(cell)
+    table.addElement(week_row)
+
+    header_row = TableRow()
+    for title in ["Project", "Task", "Assignee"]:
+        cell = TableCell(stylename=cell_header)
+        cell.addElement(P(stylename=para_header, text=title))
+        header_row.addElement(cell)
+
+    for d in dates:
+        cell = TableCell(stylename=cell_header)
+        cell.addElement(P(stylename=para_header, text=d.strftime("%Y-%m-%d")))
+        header_row.addElement(cell)
+    table.addElement(header_row)
+
+    today = datetime.now().date()
+
+    for project_name in project_names:
+        tasks = projects.get(project_name, [])
+
+        project_row = TableRow()
+
+        c = TableCell(stylename=cell_project)
+        c.addElement(P(stylename=para_project, text=project_name))
+        project_row.addElement(c)
+
+        for _ in range(2):
+            c = TableCell(stylename=cell_project)
+            c.addElement(P(stylename=para_center, text=""))
+            project_row.addElement(c)
+
+        for d in dates:
+            style = cell_today if d == today else cell_project
+            c = TableCell(stylename=style)
+            c.addElement(P(stylename=para_center, text=""))
+            project_row.addElement(c)
+
+        table.addElement(project_row)
+
+        for task_index, task in enumerate(tasks):
+            row = TableRow()
+
+            c = TableCell(stylename=cell_default)
+            c.addElement(P(stylename=para_left, text=""))
+            row.addElement(c)
+
+            c = TableCell(stylename=cell_default)
+            c.addElement(P(stylename=para_left, text=task["task"]))
+            row.addElement(c)
+
+            c = TableCell(stylename=cell_default)
+            c.addElement(P(stylename=para_left, text=task["assignee"]))
+            row.addElement(c)
+
+            active_style = cell_task_1 if task_index % 2 == 0 else cell_task_2
+            task_start = task["start"].date()
+            task_end = task["end"].date()
+
+            for d in dates:
+                if task_start <= d <= task_end:
+                    style = cell_today if d == today else active_style
+                elif d == today:
+                    style = cell_today
+                elif d.weekday() >= 5:
+                    style = cell_weekend
+                else:
+                    style = cell_default
+
+                c = TableCell(stylename=style)
+                c.addElement(P(stylename=para_center, text=""))
+                row.addElement(c)
+
+            table.addElement(row)
+
+    doc.spreadsheet.addElement(table)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    doc.save(str(output_path))
+    return output_path
+
+
 class Banner(Static):
     def on_mount(self) -> None:
         self.refresh_banner()
@@ -421,6 +704,10 @@ class AddProjectScreen(ModalScreen[str | None]):
     }
     """
 
+    BINDINGS = [
+        ("escape", "cancel_dialog", "CANCEL"),
+    ]
+
     def compose(self) -> ComposeResult:
         with Container(id="dialog"):
             yield Label("ADD PROJECT", id="dialog_title")
@@ -431,6 +718,9 @@ class AddProjectScreen(ModalScreen[str | None]):
 
     def on_mount(self) -> None:
         self.query_one("#project_name_input", Input).focus()
+
+    def action_cancel_dialog(self) -> None:
+        self.dismiss(None)
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "cancel":
@@ -475,6 +765,10 @@ class TaskEditorScreen(ModalScreen[dict | None]):
     }
     """
 
+    BINDINGS = [
+        ("escape", "cancel_dialog", "CANCEL"),
+    ]
+
     def __init__(self, title: str = "ADD TASK", task_data: dict | None = None):
         super().__init__()
         self.dialog_title = title
@@ -509,6 +803,9 @@ class TaskEditorScreen(ModalScreen[dict | None]):
 
     def on_mount(self) -> None:
         self.query_one("#task_name_input", Input).focus()
+
+    def action_cancel_dialog(self) -> None:
+        self.dismiss(None)
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "cancel":
@@ -556,6 +853,78 @@ class TaskEditorScreen(ModalScreen[dict | None]):
                 "end": end,
             }
         )
+
+
+class ExportScreen(ModalScreen[str | None]):
+    CSS = """
+    ExportScreen {
+        align: center middle;
+    }
+    #dialog {
+        width: 100;
+        height: 15;
+        padding: 1 2;
+        border: round green;
+        background: $surface;
+    }
+    #dialog_title {
+        content-align: center middle;
+        height: 1;
+        margin-bottom: 1;
+        text-style: bold;
+    }
+    #dialog_help {
+        height: 2;
+        margin-bottom: 1;
+        content-align: center middle;
+    }
+    #file_path_input {
+        margin-bottom: 1;
+    }
+    #dialog_buttons {
+        height: auto;
+        align: center middle;
+    }
+    Button {
+        margin: 0 1;
+        min-width: 12;
+    }
+    """
+
+    BINDINGS = [
+        ("escape", "cancel_dialog", "CANCEL"),
+    ]
+
+    def __init__(self, suggested_path: str):
+        super().__init__()
+        self.suggested_path = suggested_path
+
+    def compose(self) -> ComposeResult:
+        with Container(id="dialog"):
+            yield Label("EXPORT PROJECTS TO .ODS", id="dialog_title")
+            yield Label("ENTER FULL FILE PATH", id="dialog_help")
+            yield Input(value=self.suggested_path, placeholder="FULL EXPORT PATH", id="file_path_input")
+            with Horizontal(id="dialog_buttons"):
+                yield Button("EXPORT", variant="success", id="export")
+                yield Button("CANCEL", id="cancel")
+
+    def on_mount(self) -> None:
+        self.query_one("#file_path_input", Input).focus()
+
+    def action_cancel_dialog(self) -> None:
+        self.dismiss(None)
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "cancel":
+            self.dismiss(None)
+            return
+
+        file_path = self.query_one("#file_path_input", Input).value.strip()
+        self.dismiss(file_path if file_path else None)
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        file_path = event.value.strip()
+        self.dismiss(file_path if file_path else None)
 
 
 class AttachFileScreen(ModalScreen[str | None]):
@@ -963,9 +1332,18 @@ class FileBrowserScreen(ModalScreen[str | None]):
         pass
 
 
-class TaskWorkspaceScreen(Screen[dict | None]):
+class TaskWorkspaceScreen(ModalScreen[dict | None]):
     CSS = """
     TaskWorkspaceScreen {
+        align: center middle;
+    }
+
+    #workspace_dialog {
+        width: 140;
+        height: 40;
+        border: round green;
+        background: $surface;
+        padding: 1;
         layout: vertical;
     }
 
@@ -1072,41 +1450,39 @@ class TaskWorkspaceScreen(Screen[dict | None]):
             f"({self.start.strftime('%Y-%m-%d')} -> {self.end.strftime('%Y-%m-%d')})"
         )
 
-        yield Header()
-        yield Static(header, id="workspace_title")
+        with Container(id="workspace_dialog"):
+            yield Static(header, id="workspace_title")
 
-        with Horizontal(id="workspace_main"):
-            with Vertical(id="left_pane"):
-                task_info = (
-                    f"[b]{self.task_title}[/b]\n"
-                    f"PROJECT  : {self.project_name}\n"
-                    f"ASSIGNEE : {self.assignee or '-'}\n"
-                    f"START    : {self.start.strftime('%Y-%m-%d')}\n"
-                    f"END      : {self.end.strftime('%Y-%m-%d')}\n"
-                    f"TODO     : {sum(1 for t in self.todos if t.get('done'))}/{len(self.todos)} DONE"
-                )
-                yield Static(task_info, id="task_info")
-                yield Static("TODO LIST", id="todo_header")
-                yield Input(placeholder="NEW TODO ITEM", id="todo_input")
-                yield Tree("TODO", id="todo_tree")
-                with Horizontal(id="todo_buttons"):
-                    yield Button("ADD", id="add_todo", variant="success")
-                    yield Button("TOGGLE", id="toggle_todo")
-                    yield Button("DELETE", id="delete_todo")
+            with Horizontal(id="workspace_main"):
+                with Vertical(id="left_pane"):
+                    task_info = (
+                        f"[b]{self.task_title}[/b]\n"
+                        f"PROJECT  : {self.project_name}\n"
+                        f"ASSIGNEE : {self.assignee or '-'}\n"
+                        f"START    : {self.start.strftime('%Y-%m-%d')}\n"
+                        f"END      : {self.end.strftime('%Y-%m-%d')}\n"
+                        f"TODO     : {sum(1 for t in self.todos if t.get('done'))}/{len(self.todos)} DONE"
+                    )
+                    yield Static(task_info, id="task_info")
+                    yield Static("TODO LIST", id="todo_header")
+                    yield Input(placeholder="NEW TODO ITEM", id="todo_input")
+                    yield Tree("TODO", id="todo_tree")
+                    with Horizontal(id="todo_buttons"):
+                        yield Button("ADD", id="add_todo", variant="success")
+                        yield Button("TOGGLE", id="toggle_todo")
+                        yield Button("DELETE", id="delete_todo")
 
-            with Vertical(id="right_pane"):
-                yield Static("TASK NOTES / TEXT", id="notes_header")
-                yield Static(
-                    "WRITE OR EDIT TEXT HERE. USE CTRL+S OR SAVE.",
-                    id="notes_help",
-                )
-                yield TextArea(id="notes_area")
+                with Vertical(id="right_pane"):
+                    yield Static("TASK NOTES / TEXT", id="notes_header")
+                    yield Static(
+                        "WRITE OR EDIT TEXT HERE. USE CTRL+S OR SAVE.",
+                        id="notes_help",
+                    )
+                    yield TextArea(id="notes_area")
 
-        with Horizontal(id="workspace_buttons"):
-            yield Button("SAVE", variant="success", id="save")
-            yield Button("CLOSE", id="close")
-
-        yield Footer()
+            with Horizontal(id="workspace_buttons"):
+                yield Button("SAVE", variant="success", id="save")
+                yield Button("CLOSE", id="close")
 
     def on_mount(self) -> None:
         notes_area = self.query_one("#notes_area", TextArea)
@@ -1248,7 +1624,7 @@ Screen {
 }
 
 #date-panel {
-    width: 30;
+    width: 24;
     min-width: 20;
     height: 1fr;
     border: solid magenta;
@@ -1263,7 +1639,7 @@ Screen {
 }
 
 #date-labels {
-    width: 30;
+    width: 22;
     padding: 1;
 }
 
@@ -1306,6 +1682,7 @@ Screen {
         ("f", "attach_file", "ATTACH FILE"),
         ("o", "open_attachment", "OPEN FILE"),
         ("r", "remove_attachment", "REMOVE FILE"),
+        ("x", "export_projects", "EXPORT ODS"),
     ]
 
     def __init__(self):
@@ -1395,7 +1772,8 @@ Screen {
         root = tree.root
         root.remove_children()
 
-        for project_name, tasks in self.projects.items():
+        for project_name in sorted(self.projects.keys()):
+            tasks = self.projects[project_name]
             prefix = "[+]" if project_name in self.selected_projects else "[ ]"
             project_node = root.add(
                 f"{prefix} {project_name}",
@@ -1972,10 +2350,55 @@ Screen {
         self.refresh_project_tree()
         self.refresh_gantt_view()
 
-    def _month_bounds(self, date_value: date) -> tuple[date, date]:
-        first_day = date_value.replace(day=1)
-        last_day = date_value.replace(day=monthrange(date_value.year, date_value.month)[1])
-        return first_day, last_day
+    def action_export_projects(self) -> None:
+        export_names = get_export_project_names(
+            self.projects,
+            self.selected_project,
+            self.selected_projects,
+        )
+
+        if not export_names:
+            self.notify("NO PROJECTS TO EXPORT", severity="warning")
+            return
+
+        if len(export_names) == 1:
+            filename = sanitize_filename(export_names[0]) + ".ods"
+        else:
+            filename = f"pygantt_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.ods"
+
+        suggested_path = str(Path.home() / "Documents" / filename)
+        self.push_screen(ExportScreen(suggested_path), self.handle_export_projects)
+
+    def handle_export_projects(self, file_path: str | None) -> None:
+        if not file_path:
+            self.notify("EXPORT CANCELLED")
+            return
+
+        export_names = get_export_project_names(
+            self.projects,
+            self.selected_project,
+            self.selected_projects,
+        )
+
+        if not export_names:
+            self.notify("NO PROJECTS TO EXPORT", severity="warning")
+            return
+
+        try:
+            output_path = ensure_ods_path(file_path)
+
+            saved_path = export_projects_to_ods(
+                self.projects,
+                export_names,
+                output_path,
+                self.theme_data,
+            )
+
+            self.notify(f"EXPORTED: {saved_path}")
+            auto_open_file(saved_path)
+
+        except Exception as exc:
+            self.notify(f"EXPORT FAILED: {exc}", severity="error")
 
     def get_base_gantt_range(self) -> tuple[date, date]:
         today = datetime.now().date()
@@ -1993,8 +2416,7 @@ Screen {
 
         start = first_day.replace(day=1)
 
-        months_visible = 4   # change this to 3, 4, etc.
-
+        months_visible = 4
         end_year = start.year
         end_month = start.month
 
