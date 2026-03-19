@@ -22,7 +22,7 @@ Homepage = "https://github.com/RemieS/PYGANTT_GUI"
 Issues = "https://github.com/RemieS/PYGANTT_GUI/issues"
 
 [tool.setuptools]
-py-modules = ["pygantt"]
+py-modules = ["pyganttgui"]
 
 [project.scripts]
-pygantt = "pygantt:main"
+pyganttgui = "pyganttgui:main"
