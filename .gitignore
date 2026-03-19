@@ -8,3 +8,4 @@ __pycache__/
 .vscode/
 
 projects.json
+pygantt_data.json
