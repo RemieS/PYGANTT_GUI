@@ -1164,23 +1164,20 @@ class PyGanttApp(App):
     }
 
     #date-panel {
-        width: 24;
-        min-width: 20;
-        height: 1fr;
-        border: solid magenta;
-        margin-right: 1;
+        width: auto;
+        min-width: 24;
     }
 
     #date-labels-scroll {
         height: 1fr;
-        overflow-x: hidden;
+        overflow-x: auto;
         overflow-y: auto;
         border: none;
     }
 
     #date-labels {
         width: 22;
-        padding: 1;
+        white-space: nowrap;
     }
 
     #timeline-panel {
