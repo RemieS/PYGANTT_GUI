@@ -600,7 +600,7 @@ class AttachFileScreen(ModalScreen[str | None]):
     def on_mount(self) -> None:
         self.query_one("#file_path_input", Input).focus()
 
-    def on_button_pressed(self, event: Button.Pressed) -> None:
+    def on_butpipx install --force git+https://github.com/RemieS/PYGANTT_GUI.gitton_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "cancel":
             self.dismiss(None)
             return
@@ -1263,7 +1263,7 @@ Screen {
 }
 
 #date-labels {
-    width: 40;
+    width: 50;
     padding: 1;
 }
 
