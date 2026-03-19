@@ -9,3 +9,5 @@ __pycache__/
 
 projects.json
 pygantt_data.json
+
+exports/
