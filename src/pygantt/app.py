@@ -1248,7 +1248,7 @@ Screen {
 }
 
 #date-panel {
-    width: 60;
+    width: 30;
     min-width: 20;
     height: 1fr;
     border: solid magenta;
@@ -1263,7 +1263,7 @@ Screen {
 }
 
 #date-labels {
-    width: 40;
+    width: 30;
     padding: 1;
 }
 
