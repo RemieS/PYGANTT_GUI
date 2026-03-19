@@ -1176,8 +1176,7 @@ class PyGanttApp(App):
     }
 
     #date-labels {
-        width: 22;
-        white-space: nowrap;
+        width: auto;
     }
 
     #timeline-panel {
