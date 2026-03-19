@@ -1,8 +1,7 @@
-from datetime import datetime, timedelta
-from pathlib import Path
 import json
-import os
 import re
+from datetime import datetime, timedelta, date
+from pathlib import Path
 
 from odf.opendocument import OpenDocumentSpreadsheet
 from odf.table import Table, TableRow, TableCell, TableColumn
@@ -15,20 +14,10 @@ from odf.style import (
     TextProperties,
 )
 
-APP_NAME = "pygantt"
-
-
-def get_data_dir() -> Path:
-    xdg_data_home = os.environ.get("XDG_DATA_HOME")
-    if xdg_data_home:
-        data_dir = Path(xdg_data_home) / APP_NAME
-    else:
-        data_dir = Path.home() / ".local" / "share" / APP_NAME
-    data_dir.mkdir(parents=True, exist_ok=True)
-    return data_dir
-
-
-SAVE_FILE = get_data_dir() / "projects.json"
+# IMPORTANT:
+# Keep the data file next to the code/repository, like the older versions did.
+BASE_DIR = Path(__file__).resolve().parent
+DATA_FILE = BASE_DIR / "projects.json"
 
 
 def sanitize_filename(value: str) -> str:
@@ -85,86 +74,193 @@ def ensure_ods_path(file_path: str | Path) -> Path:
     return path
 
 
-def serialize_projects(projects):
-    serializable = {}
-    for project_name, tasks in projects.items():
-        serializable[project_name] = []
-        for task in tasks:
-            serializable[project_name].append(
-                {
-                    "task": task["task"],
-                    "assignee": task.get("assignee", ""),
-                    "start": task["start"].strftime("%Y-%m-%d"),
-                    "end": task["end"].strftime("%Y-%m-%d"),
-                }
-            )
-    return serializable
+def parse_task(raw: dict) -> dict:
+    start = raw.get("start")
+    end = raw.get("end")
+
+    if isinstance(start, str):
+        start = datetime.strptime(start, "%Y-%m-%d")
+    if isinstance(end, str):
+        end = datetime.strptime(end, "%Y-%m-%d")
+
+    return {
+        "task": raw.get("task", "Untitled Task"),
+        "assignee": raw.get("assignee", ""),
+        "start": start,
+        "end": end,
+        "attachments": list(raw.get("attachments", [])),
+        "notes": raw.get("notes", ""),
+        "todos": [
+            {
+                "text": item.get("text", ""),
+                "done": bool(item.get("done", False)),
+            }
+            for item in raw.get("todos", [])
+        ],
+    }
 
 
-def deserialize_projects(data):
-    projects = {}
-    for project_name, tasks in data.items():
-        projects[project_name] = []
-        for task in tasks:
-            projects[project_name].append(
-                {
-                    "task": task["task"],
-                    "assignee": task.get("assignee", ""),
-                    "start": datetime.strptime(task["start"], "%Y-%m-%d"),
-                    "end": datetime.strptime(task["end"], "%Y-%m-%d"),
-                }
-            )
-    return projects
+def serialize_task(task: dict) -> dict:
+    return {
+        "task": task["task"],
+        "assignee": task.get("assignee", ""),
+        "start": task["start"].strftime("%Y-%m-%d"),
+        "end": task["end"].strftime("%Y-%m-%d"),
+        "attachments": task.get("attachments", []),
+        "notes": task.get("notes", ""),
+        "todos": task.get("todos", []),
+    }
 
 
-def load_projects():
-    if not SAVE_FILE.exists():
+def load_projects(file_path: str | Path | None = None) -> dict[str, list[dict]]:
+    path = Path(file_path) if file_path else DATA_FILE
+
+    if not path.exists():
         return {}
 
     try:
-        with SAVE_FILE.open("r", encoding="utf-8") as f:
-            data = json.load(f)
-        return deserialize_projects(data)
-    except json.JSONDecodeError as e:
-        print(f"Invalid JSON in {SAVE_FILE}: {e}")
-        return {}
-    except Exception as e:
-        print(f"Error loading projects: {e}")
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
         return {}
 
+    # Support both:
+    # {"projects": {...}}
+    # and legacy flat {"Project A": [...]}
+    if isinstance(data, dict) and "projects" in data and isinstance(data["projects"], dict):
+        raw_projects = data["projects"]
+    elif isinstance(data, dict):
+        raw_projects = data
+    else:
+        return {}
 
-def save_projects(projects):
-    with SAVE_FILE.open("w", encoding="utf-8") as f:
-        json.dump(serialize_projects(projects), f, indent=4)
+    projects: dict[str, list[dict]] = {}
+    for project_name, task_list in raw_projects.items():
+        if not isinstance(task_list, list):
+            continue
+        projects[project_name] = [parse_task(task) for task in task_list]
+
+    return projects
 
 
-def import_projects_from_json(file_path: str | Path):
-    path = Path(file_path).expanduser()
-    with path.open("r", encoding="utf-8") as f:
-        data = json.load(f)
-
-    if "projects" in data and isinstance(data["projects"], dict):
-        return deserialize_projects(data["projects"])
-
-    if isinstance(data, dict):
-        return deserialize_projects(data)
-
-    raise ValueError("Unsupported JSON format.")
+def save_projects(projects: dict[str, list[dict]], file_path: str | Path | None = None) -> None:
+    path = Path(file_path) if file_path else DATA_FILE
+    data = {
+        "projects": {
+            project_name: [serialize_task(task) for task in tasks]
+            for project_name, tasks in projects.items()
+        }
+    }
+    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
 
-def export_projects_to_json(projects, file_path: str | Path) -> Path:
+def import_projects_from_json(file_path: str | Path) -> dict[str, list[dict]]:
+    return load_projects(file_path)
+
+
+def export_projects_to_json(
+    projects: dict[str, list[dict]],
+    file_path: str | Path,
+) -> Path:
     path = ensure_json_path(file_path)
+    data = {
+        "projects": {
+            project_name: [serialize_task(task) for task in tasks]
+            for project_name, tasks in projects.items()
+        }
+    }
     path.parent.mkdir(parents=True, exist_ok=True)
-
-    with path.open("w", encoding="utf-8") as f:
-        json.dump({"projects": serialize_projects(projects)}, f, indent=2)
-
+    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
     return path
 
 
-def get_export_project_names(projects, selected_project=None, selected_projects=None):
-    selected_projects = selected_projects or set()
+def add_project(projects: dict[str, list[dict]], project_name: str) -> bool:
+    project_name = project_name.strip()
+    if not project_name or project_name in projects:
+        return False
+    projects[project_name] = []
+    return True
 
+
+def delete_project(projects: dict[str, list[dict]], project_name: str) -> bool:
+    if project_name not in projects:
+        return False
+    del projects[project_name]
+    return True
+
+
+def add_task(
+    projects: dict[str, list[dict]],
+    project_name: str,
+    task_name: str,
+    assignee: str,
+    start: datetime,
+    end: datetime,
+) -> bool:
+    if project_name not in projects:
+        return False
+
+    projects[project_name].append(
+        {
+            "task": task_name,
+            "assignee": assignee,
+            "start": start,
+            "end": end,
+            "attachments": [],
+            "notes": "",
+            "todos": [],
+        }
+    )
+    return True
+
+
+def update_task(
+    projects: dict[str, list[dict]],
+    project_name: str,
+    task_index: int,
+    task_name: str,
+    assignee: str,
+    start: datetime,
+    end: datetime,
+) -> bool:
+    if project_name not in projects:
+        return False
+
+    tasks = projects[project_name]
+    if not (0 <= task_index < len(tasks)):
+        return False
+
+    existing = tasks[task_index]
+    tasks[task_index] = {
+        "task": task_name,
+        "assignee": assignee,
+        "start": start,
+        "end": end,
+        "attachments": existing.get("attachments", []),
+        "notes": existing.get("notes", ""),
+        "todos": existing.get("todos", []),
+    }
+    return True
+
+
+def delete_task(projects: dict[str, list[dict]], project_name: str, task_index: int) -> bool:
+    if project_name not in projects:
+        return False
+
+    tasks = projects[project_name]
+    if not (0 <= task_index < len(tasks)):
+        return False
+
+    del tasks[task_index]
+    if not tasks:
+        del projects[project_name]
+    return True
+
+
+def get_export_project_names(
+    projects: dict[str, list[dict]],
+    selected_project: str | None,
+    selected_projects: set[str],
+) -> list[str]:
     if selected_projects:
         return [name for name in sorted(selected_projects) if name in projects]
     if selected_project and selected_project in projects:
@@ -172,8 +268,11 @@ def get_export_project_names(projects, selected_project=None, selected_projects=
     return sorted(projects.keys())
 
 
-def get_export_date_range(projects, project_names):
-    task_dates = []
+def get_export_date_range(
+    projects: dict[str, list[dict]],
+    project_names: list[str],
+) -> tuple[date, date] | None:
+    task_dates: list[tuple[date, date]] = []
 
     for project_name in project_names:
         for task in projects.get(project_name, []):
@@ -188,10 +287,10 @@ def get_export_date_range(projects, project_names):
 
 
 def export_projects_to_ods(
-    projects,
-    project_names,
-    output_path: str | Path,
-    theme: dict | None = None,
+    projects: dict[str, list[dict]],
+    project_names: list[str],
+    output_path: Path,
+    theme: dict,
 ) -> Path:
     if not project_names:
         raise ValueError("No projects selected.")
@@ -199,15 +298,6 @@ def export_projects_to_ods(
     date_range = get_export_date_range(projects, project_names)
     if not date_range:
         raise ValueError("No tasks found.")
-
-    theme = theme or {
-        "border_primary": "#1f4e78",
-        "border_secondary": "#d9eaf7",
-        "task_bar_1": "#a9d18e",
-        "task_bar_2": "#9fd5ff",
-        "current_day": "#ffd966",
-        "text": "#000000",
-    }
 
     start_date, end_date = date_range
 
@@ -349,7 +439,7 @@ def export_projects_to_ods(
             row.addElement(c)
 
             c = TableCell(stylename=cell_default)
-            c.addElement(P(stylename=para_left, text=task.get("assignee", "")))
+            c.addElement(P(stylename=para_left, text=task["assignee"]))
             row.addElement(c)
 
             active_style = cell_task_1 if task_index % 2 == 0 else cell_task_2
@@ -373,68 +463,6 @@ def export_projects_to_ods(
             table.addElement(row)
 
     doc.spreadsheet.addElement(table)
-
-    output_path = ensure_ods_path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     doc.save(str(output_path))
     return output_path
-
-
-def add_project(projects, project_name):
-    project_name = project_name.strip()
-    if not project_name:
-        return False
-    if project_name in projects:
-        return False
-    projects[project_name] = []
-    return True
-
-
-def add_task(projects, project_name, task_name, assignee, start, end):
-    if project_name not in projects:
-        projects[project_name] = []
-    projects[project_name].append(
-        {
-            "task": task_name,
-            "assignee": assignee,
-            "start": start,
-            "end": end,
-        }
-    )
-
-
-def update_task(projects, project_name, task_index, task_name, assignee, start, end):
-    if project_name not in projects:
-        return False
-
-    tasks = projects[project_name]
-    if not (0 <= task_index < len(tasks)):
-        return False
-
-    tasks[task_index] = {
-        "task": task_name,
-        "assignee": assignee,
-        "start": start,
-        "end": end,
-    }
-    return True
-
-
-def delete_project(projects, project_name):
-    if project_name in projects:
-        del projects[project_name]
-        return True
-    return False
-
-
-def delete_task(projects, project_name, task_index):
-    if project_name not in projects:
-        return False
-
-    tasks = projects[project_name]
-    if 0 <= task_index < len(tasks):
-        del tasks[task_index]
-        if not tasks:
-            del projects[project_name]
-        return True
-    return False
