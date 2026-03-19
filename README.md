@@ -45,7 +45,8 @@ pip install git+https://github.com/RemieS/PYGANTT_GUI.git
 ### Upgrade
 
 ``` bash
-pip install --upgrade git+https://github.com/RemieS/PYGANTT_GUI.git
+py -m pip uninstall pygantt-retro -y
+py -m pip install --force-reinstall --no-cache-dir git+https://github.com/RemieS/PYGANTT_GUI.git
 ```
 
 ------------------------------------------------------------------------
