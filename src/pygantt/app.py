@@ -1263,7 +1263,7 @@ Screen {
 }
 
 #date-labels {
-    width: 22;
+    width: 40;
     padding: 1;
 }
 
