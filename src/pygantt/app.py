@@ -1217,8 +1217,8 @@ class PyGanttApp(App):
     }
     
     #banner {
-        margin: 0 1 1 1;
         padding: 1 0 1 0;
+        margin-bottom: 1;
     }
     
     #lower-panels {
@@ -1335,9 +1335,10 @@ class PyGanttApp(App):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        yield Banner(id="banner")
 
         with Vertical(id="main"):
+            yield Banner(id="banner")
+
             with Horizontal(id="lower-panels"):
                 with Vertical(id="projects-panel"):
                     yield Tree("PROJECTS", id="projects")
