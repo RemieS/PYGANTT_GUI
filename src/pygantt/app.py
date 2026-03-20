@@ -184,22 +184,12 @@ FALLBACK_BANNERS = [
     }
 ]
 
-LEFT_PANEL_WIDTH = 34
 MONTHS_VISIBLE = 4
 TIMELINE_CELL_WIDTH = 2
-
-MODAL_WIDTH_SMALL = 60
-MODAL_WIDTH_MEDIUM = 72
-MODAL_WIDTH_LARGE = 90
-MODAL_WIDTH_XL = 116
-
-MODAL_HEIGHT_CONFIRM = 14
-MODAL_HEIGHT_INPUT = 15
-MODAL_HEIGHT_EDITOR = 25
-MODAL_HEIGHT_BROWSER = 38
+TASK_PANEL_WIDTH = 34
 
 
-def load_custom_banners(file_path: str = CUSTOM_BANNERS_FILE) -> list[dict]:
+def load_custom_banners(file_path: str | Path = CUSTOM_BANNERS_FILE) -> list[dict]:
     if not os.path.exists(file_path):
         return []
 
@@ -210,7 +200,6 @@ def load_custom_banners(file_path: str = CUSTOM_BANNERS_FILE) -> list[dict]:
     with open(file_path, "r", encoding="utf-8") as handle:
         for raw_line in handle:
             line = raw_line.rstrip("\n")
-
             if line.startswith("===") and line.endswith("==="):
                 if current_name and current_lines:
                     art = "\n".join(current_lines).rstrip()
@@ -237,6 +226,22 @@ def shorten_middle(value: str, max_length: int = 64) -> str:
     left = (max_length - 3) // 2
     right = max_length - 3 - left
     return f"{value[:left]}...{value[-right:]}"
+
+
+def single_line(value: str) -> str:
+    value = str(value).replace("\n", " ").replace("\r", " ").replace("\t", " ")
+    return " ".join(value.split())
+
+
+def fixed_width(text: str, width: int) -> str:
+    text = single_line(text)
+    if width <= 0:
+        return ""
+    if len(text) > width:
+        if width <= 3:
+            return text[:width]
+        return text[: width - 3] + "..."
+    return text.ljust(width)
 
 
 def auto_open_file(file_path: str | Path) -> None:
@@ -304,14 +309,6 @@ def retro_file_tag(file_path: str) -> str:
     return "[F]"
 
 
-def pad_label(text: str, width: int = LEFT_PANEL_WIDTH) -> str:
-    plain = str(text).replace("\n", " ").replace("\r", " ").replace("\t", " ")
-    plain = " ".join(plain.split())
-    if len(plain) > width:
-        plain = plain[: width - 3] + "..."
-    return plain.ljust(width)
-
-
 class Banner(Static):
     def on_mount(self) -> None:
         self.refresh_banner()
@@ -334,35 +331,35 @@ class Banner(Static):
 
 
 class ConfirmScreen(ModalScreen[bool]):
-    CSS = f"""
-    ConfirmScreen {{
+    CSS = """
+    ConfirmScreen {
         align: center middle;
-    }}
-    #dialog {{
-        width: {MODAL_WIDTH_MEDIUM};
-        height: {MODAL_HEIGHT_CONFIRM};
+    }
+    #dialog {
+        width: 60;
+        height: 14;
         padding: 1 2 1 2;
         border: round red;
-    }}
-    #dialog_title {{
+    }
+    #dialog_title {
         text-style: bold;
         content-align: left middle;
         height: 1;
         margin-bottom: 1;
-    }}
-    #dialog_message {{
+    }
+    #dialog_message {
         content-align: left middle;
         height: 3;
         margin-bottom: 1;
-    }}
-    #dialog_buttons {{
+    }
+    #dialog_buttons {
         height: 3;
         align: center middle;
-    }}
-    Button {{
+    }
+    Button {
         margin: 0 1;
         min-width: 12;
-    }}
+    }
     """
 
     def __init__(self, title: str, message: str):
@@ -386,33 +383,33 @@ class ConfirmScreen(ModalScreen[bool]):
 
 
 class AddProjectScreen(ModalScreen[str | None]):
-    CSS = f"""
-    AddProjectScreen {{
+    CSS = """
+    AddProjectScreen {
         align: center middle;
-    }}
-    #dialog {{
-        width: {MODAL_WIDTH_SMALL};
-        height: {MODAL_HEIGHT_INPUT};
+    }
+    #dialog {
+        width: 60;
+        height: 15;
         padding: 1 2 1 2;
         border: round cyan;
-    }}
-    #dialog_title {{
+    }
+    #dialog_title {
         content-align: left middle;
         height: 1;
         margin-bottom: 1;
         text-style: bold;
-    }}
-    #project_name_input {{
+    }
+    #project_name_input {
         margin-bottom: 1;
-    }}
-    #dialog_buttons {{
+    }
+    #dialog_buttons {
         height: 3;
         align: center middle;
-    }}
-    Button {{
+    }
+    Button {
         margin: 0 1;
         min-width: 12;
-    }}
+    }
     """
 
     BINDINGS = [("escape", "cancel_dialog", "CANCEL")]
@@ -445,33 +442,33 @@ class AddProjectScreen(ModalScreen[str | None]):
 
 
 class TaskEditorScreen(ModalScreen[dict | None]):
-    CSS = f"""
-    TaskEditorScreen {{
+    CSS = """
+    TaskEditorScreen {
         align: center middle;
-    }}
-    #dialog {{
-        width: {MODAL_WIDTH_MEDIUM};
-        height: {MODAL_HEIGHT_EDITOR};
+    }
+    #dialog {
+        width: 72;
+        height: 25;
         padding: 1 2 1 2;
         border: round green;
-    }}
-    #dialog_title {{
+    }
+    #dialog_title {
         content-align: left middle;
         height: 1;
         margin-bottom: 1;
         text-style: bold;
-    }}
-    Input {{
+    }
+    Input {
         margin-bottom: 1;
-    }}
-    #dialog_buttons {{
+    }
+    #dialog_buttons {
         height: 3;
         align: center middle;
-    }}
-    Button {{
+    }
+    Button {
         margin: 0 1;
         min-width: 12;
-    }}
+    }
     """
 
     BINDINGS = [("escape", "cancel_dialog", "CANCEL")]
@@ -614,417 +611,6 @@ class ExportScreen(ModalScreen[str | None]):
     def on_input_submitted(self, event: Input.Submitted) -> None:
         file_path = event.value.strip()
         self.dismiss(file_path if file_path else None)
-
-
-class AttachFileScreen(ModalScreen[str | None]):
-    CSS = """
-    AttachFileScreen {
-        align: center middle;
-    }
-    #dialog {
-        width: 80;
-        height: 15;
-        padding: 1 2 1 2;
-        border: round yellow;
-    }
-    #dialog_title {
-        content-align: left middle;
-        height: 1;
-        margin-bottom: 1;
-        text-style: bold;
-    }
-    #file_path_input {
-        margin-bottom: 1;
-    }
-    #dialog_buttons {
-        height: 3;
-        align: center middle;
-    }
-    Button {
-        margin: 0 1;
-        min-width: 12;
-    }
-    """
-
-    BINDINGS = [("escape", "cancel_dialog", "CANCEL")]
-
-    def compose(self) -> ComposeResult:
-        with Container(id="dialog"):
-            yield Label("ATTACH FILE BY PATH", id="dialog_title")
-            yield Input(placeholder="FULL FILE PATH", id="file_path_input")
-            with Horizontal(id="dialog_buttons"):
-                yield Button("ATTACH", variant="success", id="attach")
-                yield Button("CANCEL", id="cancel")
-
-    def on_mount(self) -> None:
-        self.app.style_modal(self)
-        self.query_one("#file_path_input", Input).focus()
-
-    def action_cancel_dialog(self) -> None:
-        self.dismiss(None)
-
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "cancel":
-            self.dismiss(None)
-            return
-        file_path = self.query_one("#file_path_input", Input).value.strip()
-        self.dismiss(file_path if file_path else None)
-
-    def on_input_submitted(self, event: Input.Submitted) -> None:
-        file_path = event.value.strip()
-        self.dismiss(file_path if file_path else None)
-
-
-class AttachMethodScreen(ModalScreen[str | None]):
-    CSS = """
-    AttachMethodScreen {
-        align: center middle;
-    }
-    #dialog {
-        width: 60;
-        height: 15;
-        padding: 1 2 1 2;
-        border: round green;
-    }
-    #dialog_title {
-        content-align: left middle;
-        text-style: bold;
-        height: 1;
-        margin-bottom: 1;
-    }
-    #dialog_message {
-        content-align: left middle;
-        height: 2;
-        margin-bottom: 1;
-    }
-    #dialog_buttons {
-        height: 3;
-        align: center middle;
-    }
-    Button {
-        margin: 0 1;
-        min-width: 14;
-    }
-    """
-
-    BINDINGS = [("escape", "cancel_dialog", "CANCEL")]
-
-    def compose(self) -> ComposeResult:
-        with Container(id="dialog"):
-            yield Label("ATTACH FILE", id="dialog_title")
-            yield Label("SELECT INPUT METHOD", id="dialog_message")
-            with Horizontal(id="dialog_buttons"):
-                yield Button("ENTER PATH", variant="success", id="path")
-                yield Button("BROWSE", id="browse")
-                yield Button("CANCEL", id="cancel")
-
-    def on_mount(self) -> None:
-        self.app.style_modal(self)
-
-    def action_cancel_dialog(self) -> None:
-        self.dismiss(None)
-
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "cancel":
-            self.dismiss(None)
-        elif event.button.id == "path":
-            self.dismiss("path")
-        elif event.button.id == "browse":
-            self.dismiss("browse")
-
-
-class AttachmentPickerScreen(ModalScreen[str | None]):
-    CSS = """
-    AttachmentPickerScreen {
-        align: center middle;
-    }
-    #dialog {
-        width: 90;
-        height: 24;
-        padding: 1 2 1 2;
-        border: round cyan;
-    }
-    #dialog_title {
-        content-align: left middle;
-        text-style: bold;
-        height: 1;
-        margin-bottom: 1;
-    }
-    #attachment_tree {
-        height: 1fr;
-        margin-bottom: 1;
-    }
-    #dialog_buttons {
-        height: 3;
-        align: center middle;
-    }
-    Button {
-        margin: 0 1;
-        min-width: 12;
-    }
-    """
-
-    BINDINGS = [("escape", "cancel_dialog", "CANCEL")]
-
-    def __init__(self, title: str, attachments: list[str]):
-        super().__init__()
-        self.dialog_title = title
-        self.attachments = attachments
-
-    def compose(self) -> ComposeResult:
-        with Container(id="dialog"):
-            yield Label(self.dialog_title, id="dialog_title")
-            yield Tree("FILES", id="attachment_tree")
-            with Horizontal(id="dialog_buttons"):
-                yield Button("SELECT", variant="success", id="select")
-                yield Button("CANCEL", id="cancel")
-
-    def on_mount(self) -> None:
-        self.app.style_modal(self)
-        tree = self.query_one("#attachment_tree", Tree)
-        root = tree.root
-        root.expand()
-        root.remove_children()
-
-        for path in self.attachments:
-            filename = os.path.basename(path) or path
-            root.add(f"{retro_file_tag(path)} {filename}", data=path)
-
-        if root.children:
-            tree.select_node(root.children[0])
-        tree.focus()
-
-    def action_cancel_dialog(self) -> None:
-        self.dismiss(None)
-
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "cancel":
-            self.dismiss(None)
-            return
-
-        tree = self.query_one("#attachment_tree", Tree)
-        node = tree.cursor_node
-        if node and isinstance(node.data, str):
-            self.dismiss(node.data)
-        else:
-            self.dismiss(None)
-
-
-class FileBrowserScreen(ModalScreen[str | None]):
-    CSS = f"""
-    FileBrowserScreen {{
-        align: center middle;
-    }}
-    #dialog {{
-        width: {MODAL_WIDTH_XL};
-        height: {MODAL_HEIGHT_BROWSER};
-        padding: 1 2 1 2;
-        border: round yellow;
-    }}
-    #dialog_title {{
-        content-align: left middle;
-        text-style: bold;
-        height: 1;
-        margin-bottom: 1;
-    }}
-    #current_path {{
-        height: 2;
-        margin-bottom: 1;
-    }}
-    #filter_line {{
-        height: 1;
-        margin-bottom: 1;
-    }}
-    #browser_tree {{
-        height: 1fr;
-        margin-bottom: 1;
-    }}
-    #dialog_buttons {{
-        height: 3;
-        align: center middle;
-    }}
-    Button {{
-        margin: 0 1;
-        min-width: 11;
-    }}
-    """
-
-    BINDINGS = [
-        ("backspace", "go_up", "UP"),
-        ("h", "toggle_hidden", "HIDDEN"),
-        ("enter", "activate_selection", "OPEN/SELECT"),
-        ("escape", "cancel_dialog", "CANCEL"),
-    ]
-
-    def __init__(self, start_path: str | None = None):
-        super().__init__()
-        if start_path and os.path.isdir(start_path):
-            self.current_path = os.path.abspath(start_path)
-        else:
-            self.current_path = os.path.expanduser("~")
-        self.show_hidden = False
-        self.file_filter = "all"
-
-    def compose(self) -> ComposeResult:
-        with Container(id="dialog"):
-            yield Label("RETRO FILE BROWSER", id="dialog_title")
-            yield Static("", id="current_path")
-            yield Static("", id="filter_line")
-            yield Tree("FILES", id="browser_tree")
-            with Horizontal(id="dialog_buttons"):
-                yield Button("OPEN DIR", id="open_folder")
-                yield Button("SELECT", variant="success", id="select")
-                yield Button("UP", id="up")
-                yield Button("HIDDEN", id="toggle_hidden")
-                yield Button("FILTER", id="change_filter")
-                yield Button("CANCEL", id="cancel")
-
-    def on_mount(self) -> None:
-        self.app.style_modal(self)
-        self.refresh_browser()
-        self.query_one("#browser_tree", Tree).focus()
-
-    def action_cancel_dialog(self) -> None:
-        self.dismiss(None)
-
-    def matches_filter(self, filename: str) -> bool:
-        ext = os.path.splitext(filename)[1].lower()
-        filter_groups = {
-            "all": set(),
-            "text": {".txt", ".md", ".rtf"},
-            "pdf": {".pdf"},
-            "images": {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp"},
-            "writer": {".doc", ".docx", ".odt"},
-            "calc": {".xls", ".xlsx", ".ods", ".csv", ".tsv"},
-            "impress": {".ppt", ".pptx", ".odp"},
-        }
-
-        if self.file_filter == "all":
-            return True
-        return ext in filter_groups.get(self.file_filter, set())
-
-    def refresh_browser(self) -> None:
-        path_label = self.query_one("#current_path", Static)
-        filter_label = self.query_one("#filter_line", Static)
-        hidden_text = "ON" if self.show_hidden else "OFF"
-
-        path_label.update(f"[b]PATH :[/b] {shorten_middle(self.current_path, 96)}")
-        filter_label.update(f"[b]HIDDEN :[/b] {hidden_text}    [b]FILTER :[/b] {self.file_filter.upper()}")
-
-        tree = self.query_one("#browser_tree", Tree)
-        root = tree.root
-        root.remove_children()
-        root.set_label(os.path.basename(self.current_path) or self.current_path)
-        root.data = {"type": "folder", "path": self.current_path}
-        root.expand()
-
-        parent = os.path.dirname(self.current_path)
-        if parent and parent != self.current_path:
-            root.add("[D] ..", data={"type": "folder", "path": parent})
-
-        try:
-            entries = sorted(
-                os.scandir(self.current_path),
-                key=lambda entry: (not entry.is_dir(), entry.name.lower()),
-            )
-        except Exception as exc:
-            self.app.notify(f"READ ERROR: {exc}", severity="error")
-            entries = []
-
-        for entry in entries:
-            try:
-                name = entry.name
-                if not self.show_hidden and name.startswith("."):
-                    continue
-
-                if entry.is_dir():
-                    root.add(f"[D] {name}", data={"type": "folder", "path": entry.path})
-                else:
-                    if not self.matches_filter(name):
-                        continue
-                    root.add(f"{retro_file_tag(entry.path)} {name}", data={"type": "file", "path": entry.path})
-            except (PermissionError, OSError):
-                continue
-
-        if root.children:
-            tree.select_node(root.children[0])
-
-    def cycle_filter(self) -> None:
-        filters = ["all", "text", "pdf", "images", "writer", "calc", "impress"]
-        current_index = filters.index(self.file_filter)
-        self.file_filter = filters[(current_index + 1) % len(filters)]
-        self.refresh_browser()
-        self.app.notify(f"FILTER = {self.file_filter.upper()}")
-
-    def get_selected_node_data(self) -> dict | None:
-        tree = self.query_one("#browser_tree", Tree)
-        node = tree.cursor_node
-        if node is None or not isinstance(node.data, dict):
-            return None
-        return node.data
-
-    def action_go_up(self) -> None:
-        parent = os.path.dirname(self.current_path)
-        if parent and parent != self.current_path:
-            self.current_path = parent
-            self.refresh_browser()
-
-    def action_toggle_hidden(self) -> None:
-        self.show_hidden = not self.show_hidden
-        self.refresh_browser()
-
-    def action_activate_selection(self) -> None:
-        node_data = self.get_selected_node_data()
-        if not node_data:
-            return
-
-        node_type = node_data.get("type")
-        path = node_data.get("path")
-
-        if node_type == "folder" and path:
-            self.current_path = path
-            self.refresh_browser()
-        elif node_type == "file" and path:
-            self.dismiss(path)
-
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "cancel":
-            self.dismiss(None)
-            return
-
-        if event.button.id == "up":
-            self.action_go_up()
-            return
-
-        if event.button.id == "toggle_hidden":
-            self.action_toggle_hidden()
-            return
-
-        if event.button.id == "change_filter":
-            self.cycle_filter()
-            return
-
-        node_data = self.get_selected_node_data()
-        if not node_data:
-            self.app.notify("NO ITEM SELECTED", severity="warning")
-            return
-
-        node_type = node_data.get("type")
-        path = node_data.get("path")
-
-        if event.button.id == "open_folder":
-            if node_type == "folder" and path:
-                self.current_path = path
-                self.refresh_browser()
-            else:
-                self.app.notify("SELECT A DIRECTORY", severity="warning")
-            return
-
-        if event.button.id == "select":
-            if node_type == "file" and path:
-                self.dismiss(path)
-            else:
-                self.app.notify("SELECT A FILE", severity="warning")
 
 
 class TaskWorkspaceScreen(ModalScreen[dict | None]):
@@ -1200,7 +786,7 @@ class TaskWorkspaceScreen(ModalScreen[dict | None]):
 
         for index, item in enumerate(self.todos):
             mark = "[X]" if item.get("done", False) else "[ ]"
-            root.add(f"{mark} {item.get('text', '')}", data=index)
+            root.add(f"{mark} {single_line(item.get('text', ''))}", data=index)
 
         if root.children:
             tree.select_node(root.children[0])
@@ -1308,19 +894,25 @@ class PyGanttApp(App):
         margin-right: 1;
     }
 
+    #tasks-panel {
+        width: 38;
+        min-width: 32;
+        height: 1fr;
+        margin-right: 1;
+    }
+
+    #timeline-panel {
+        width: 1fr;
+        min-width: 80;
+        height: 1fr;
+    }
+
     #projects {
         height: 1fr;
         border: none;
     }
 
-    #date-panel {
-        width: 36;
-        min-width: 36;
-        height: 1fr;
-        margin-right: 1;
-    }
-
-    #date-labels-scroll {
+    #tasks-scroll {
         width: 1fr;
         height: 1fr;
         overflow-x: hidden;
@@ -1328,16 +920,10 @@ class PyGanttApp(App):
         border: none;
     }
 
-    #date-labels {
+    #tasks-view {
         width: 34;
         height: auto;
         padding: 1;
-    }
-
-    #timeline-panel {
-        width: 1fr;
-        min-width: 80;
-        height: 1fr;
     }
 
     #gantt-timeline-scroll {
@@ -1373,9 +959,6 @@ class PyGanttApp(App):
         ("p", "cycle_theme", "THEME"),
         ("b", "toggle_background", "BG"),
         ("l", "cycle_logo", "LOGO"),
-        ("f", "attach_file", "ATTACH FILE"),
-        ("o", "open_attachment", "OPEN FILE"),
-        ("r", "remove_attachment", "REMOVE FILE"),
         ("x", "export_projects", "EXPORT ODS"),
     ]
 
@@ -1386,7 +969,6 @@ class PyGanttApp(App):
         self.selected_task_index: int | None = None
         self.selected_projects: set[str] = set()
         self.gantt_day_offset = 0
-        self.last_browsed_path = os.path.expanduser("~")
 
         self.theme_names = list(THEMES.keys())
         self.theme_name = "retro_neon"
@@ -1434,9 +1016,9 @@ class PyGanttApp(App):
                 with Vertical(id="projects-panel"):
                     yield Tree("PROJECTS", id="projects")
 
-                with Vertical(id="date-panel"):
-                    with ScrollableContainer(id="date-labels-scroll"):
-                        yield Static(id="date-labels")
+                with Vertical(id="tasks-panel"):
+                    with ScrollableContainer(id="tasks-scroll"):
+                        yield Static(id="tasks-view")
 
                 with Vertical(id="timeline-panel"):
                     with ScrollableContainer(id="gantt-timeline-scroll"):
@@ -1536,23 +1118,23 @@ class PyGanttApp(App):
         projects_panel.styles.color = theme["text"]
         projects_panel.styles.border = ("solid", theme["border_primary"])
 
-        date_panel = self.query_one("#date-panel")
-        date_panel.styles.background = theme["panel"]
-        date_panel.styles.color = theme["text"]
-        date_panel.styles.border = ("solid", theme["border_secondary"])
+        tasks_panel = self.query_one("#tasks-panel")
+        tasks_panel.styles.background = theme["panel"]
+        tasks_panel.styles.color = theme["text"]
+        tasks_panel.styles.border = ("solid", theme["border_secondary"])
 
         timeline_panel = self.query_one("#timeline-panel")
         timeline_panel.styles.background = theme["panel"]
         timeline_panel.styles.color = theme["text"]
         timeline_panel.styles.border = ("solid", theme["border_primary"])
 
-        self.query_one("#date-labels-scroll").styles.background = theme["surface"]
-        self.query_one("#date-labels-scroll").styles.color = theme["text"]
+        self.query_one("#tasks-scroll").styles.background = theme["surface"]
+        self.query_one("#tasks-scroll").styles.color = theme["text"]
         self.query_one("#gantt-timeline-scroll").styles.background = theme["surface"]
         self.query_one("#gantt-timeline-scroll").styles.color = theme["text"]
 
-        self.query_one("#date-labels").styles.background = theme["surface"]
-        self.query_one("#date-labels").styles.color = theme["text"]
+        self.query_one("#tasks-view").styles.background = theme["surface"]
+        self.query_one("#tasks-view").styles.color = theme["text"]
         self.query_one("#gantt-timeline").styles.background = theme["surface"]
         self.query_one("#gantt-timeline").styles.color = theme["text"]
 
@@ -1577,7 +1159,7 @@ class PyGanttApp(App):
             for index, task in enumerate(tasks):
                 color = task_status_color(task, self.theme_data)
                 status = task_status_label(task)
-                task_label = f"[{color}]{status} {task['task']}[/]"
+                task_label = f"[{color}]{status} {single_line(task['task'])}[/]"
                 project_node.add(
                     task_label,
                     data={
@@ -1641,27 +1223,54 @@ class PyGanttApp(App):
         shift = timedelta(days=self.gantt_day_offset)
         return start + shift, end + shift
 
+    def build_gantt_rows(self) -> list[dict]:
+        rows: list[dict] = []
+
+        for project_name in self.get_selected_projects_for_gantt():
+            project_tasks = self.projects.get(project_name, [])
+
+            rows.append(
+                {
+                    "type": "project_header",
+                    "project": project_name,
+                }
+            )
+
+            for task_index, task in enumerate(project_tasks):
+                rows.append(
+                    {
+                        "type": "task",
+                        "project": project_name,
+                        "task_index": task_index,
+                        "task": task,
+                        "selected": (
+                            self.selected_project == project_name
+                            and self.selected_task_index == task_index
+                        ),
+                    }
+                )
+
+        return rows
+
     def refresh_gantt_view(self) -> None:
-        labels = self.query_one("#date-labels", Static)
+        tasks_view = self.query_one("#tasks-view", Static)
         timeline = self.query_one("#gantt-timeline", Static)
 
-        selected = self.get_selected_projects_for_gantt()
         start_date, end_date = self.get_gantt_visible_range()
+        rows = self.build_gantt_rows()
 
         left_lines, right_lines = self.build_gantt_lines(
-            selected_projects=selected,
-            projects=self.projects,
+            rows=rows,
             start_date=start_date,
             end_date=end_date,
         )
 
-        labels.update("\n".join(left_lines))
+        tasks_view.update("\n".join(left_lines))
         timeline.update("\n".join(right_lines))
 
     def build_gantt_lines(
         self,
-        selected_projects: list[str],
-        projects: dict[str, list[dict]],
+        rows: list[dict],
         start_date: date,
         end_date: date,
     ) -> tuple[list[str], list[str]]:
@@ -1733,11 +1342,11 @@ class PyGanttApp(App):
         dow_values = [d.strftime("%a")[:2].upper() for d in days]
 
         left_lines += [
-            f"[bold {theme['border_primary']}]{pad_label('YEAR')}[/]",
-            f"[bold {theme['border_primary']}]{pad_label('MONTH')}[/]",
-            f"[bold {theme['border_primary']}]{pad_label('WEEK')}[/]",
-            f"[bold {theme['border_primary']}]{pad_label('DATE')}[/]",
-            f"[bold {theme['border_primary']}]{pad_label('DAY')}[/]",
+            f"[bold {theme['border_primary']}]{fixed_width('YEAR', TASK_PANEL_WIDTH)}[/]",
+            f"[bold {theme['border_primary']}]{fixed_width('MONTH', TASK_PANEL_WIDTH)}[/]",
+            f"[bold {theme['border_primary']}]{fixed_width('WEEK', TASK_PANEL_WIDTH)}[/]",
+            f"[bold {theme['border_primary']}]{fixed_width('DATE', TASK_PANEL_WIDTH)}[/]",
+            f"[bold {theme['border_primary']}]{fixed_width('DAY', TASK_PANEL_WIDTH)}[/]",
         ]
         right_lines += [
             f"[{theme['border_primary']}]{grouped(year_values)}[/]",
@@ -1747,48 +1356,51 @@ class PyGanttApp(App):
             f"[{theme['text']}]{plain(dow_values)}[/]",
         ]
 
-        if not selected_projects:
-            left_lines.append(f"[{theme['accent_warn']}]{pad_label('NO TASKS SELECTED')}[/]")
+        if not rows:
+            left_lines.append(f"[{theme['accent_warn']}]{fixed_width('NO TASKS SELECTED', TASK_PANEL_WIDTH)}[/]")
             right_lines.append(blank_row())
             return left_lines, right_lines
 
-        global_row_counter = 0
+        task_row_counter = 0
 
-        for project_name in selected_projects:
-            project_tasks = projects.get(project_name, [])
+        for row in rows:
+            row_type = row["type"]
 
-            if not project_tasks:
-                left_lines.append(f"[bold {theme['project_header']}]{pad_label('(NO TASKS)')}[/]")
+            if row_type == "project_header":
+                project_name = row["project"]
+                left_lines.append(
+                    f"[bold {theme['project_header']}]{fixed_width(project_name, TASK_PANEL_WIDTH)}[/]"
+                )
                 right_lines.append(blank_row())
                 continue
 
-            for task_index, task in enumerate(project_tasks):
-                task_start = task["start"].date()
-                task_end = task["end"].date()
-                status = task_status_label(task)
+            task = row["task"]
+            project_name = row["project"]
+            task_index = row["task_index"]
+            is_selected = row["selected"]
 
-                is_selected = (
-                    self.selected_project == project_name
-                    and self.selected_task_index == task_index
+            task_start = task["start"].date()
+            task_end = task["end"].date()
+            status = task_status_label(task)
+
+            task_text = f"  {status} {single_line(task['task'])}"
+            task_text = fixed_width(task_text, TASK_PANEL_WIDTH)
+
+            if is_selected:
+                left_lines.append(f"[bold {theme['text']} on {theme['selection']}]{task_text}[/]")
+            else:
+                color = task_status_color(task, theme)
+                left_lines.append(f"[{color}]{task_text}[/]")
+
+            right_lines.append(
+                make_task_row(
+                    task_start=task_start,
+                    task_end=task_end,
+                    is_selected_task=is_selected,
+                    row_number=task_row_counter,
                 )
-
-                # ONLY task text here, no project name, no extra symbols
-                row_text = pad_label(f"{status} {task['task']}")
-
-                if is_selected:
-                    left_lines.append(f"[bold {theme['text']} on {theme['selection']}]{row_text}[/]")
-                else:
-                    left_lines.append(f"[{theme['text']}]{row_text}[/]")
-
-                right_lines.append(
-                    make_task_row(
-                        task_start=task_start,
-                        task_end=task_end,
-                        is_selected_task=is_selected,
-                        row_number=global_row_counter,
-                    )
-                )
-                global_row_counter += 1
+            )
+            task_row_counter += 1
 
         return left_lines, right_lines
 
@@ -2004,154 +1616,6 @@ class PyGanttApp(App):
         self.refresh_project_tree()
         self.refresh_gantt_view()
         self.notify("TASK WORKSPACE SAVED")
-
-    def action_attach_file(self) -> None:
-        if not self.get_selected_task():
-            self.notify("SELECT A TASK FIRST", severity="warning")
-            return
-        self.push_screen(AttachMethodScreen(), self.handle_attach_method)
-
-    def handle_attach_method(self, method: str | None) -> None:
-        if not method:
-            self.notify("ATTACH CANCELLED")
-            return
-
-        if method == "path":
-            self.push_screen(AttachFileScreen(), self.handle_attach_file)
-        elif method == "browse":
-            self.push_screen(FileBrowserScreen(self.last_browsed_path), self.handle_attach_file)
-
-    def handle_attach_file(self, file_path: str | None) -> None:
-        if not file_path:
-            self.notify("ATTACH CANCELLED")
-            return
-
-        normalized = os.path.abspath(os.path.expanduser(file_path))
-        if not os.path.exists(normalized):
-            self.notify(f"FILE NOT FOUND: {normalized}", severity="error")
-            return
-        if os.path.isdir(normalized):
-            self.notify("SELECT A FILE, NOT A DIRECTORY", severity="warning")
-            return
-
-        task = self.get_selected_task()
-        if not task:
-            self.notify("NO TASK SELECTED", severity="warning")
-            return
-
-        self.last_browsed_path = os.path.dirname(normalized) or self.last_browsed_path
-        attachments = task.setdefault("attachments", [])
-        if normalized in attachments:
-            self.notify("FILE ALREADY ATTACHED", severity="warning")
-            return
-
-        attachments.append(normalized)
-        save_projects(self.projects)
-        self.notify(f"ATTACHED: {os.path.basename(normalized)}")
-
-    def action_open_attachment(self) -> None:
-        task = self.get_selected_task()
-        if not task:
-            self.notify("SELECT A TASK FIRST", severity="warning")
-            return
-
-        attachments = task.get("attachments", [])
-        if not attachments:
-            self.notify("NO ATTACHMENTS", severity="warning")
-            return
-
-        if len(attachments) == 1:
-            self.open_file_path(attachments[0])
-            return
-
-        self.push_screen(
-            AttachmentPickerScreen("OPEN ATTACHMENT", attachments),
-            self.handle_open_attachment_selection,
-        )
-
-    def handle_open_attachment_selection(self, file_path: str | None) -> None:
-        if not file_path:
-            self.notify("OPEN CANCELLED")
-            return
-        self.open_file_path(file_path)
-
-    def open_with_libreoffice_mode(self, file_path: str, mode: str) -> bool:
-        try:
-            if sys.platform.startswith("win"):
-                subprocess.Popen(["soffice", f"--{mode}", file_path])
-            else:
-                subprocess.Popen(["libreoffice", f"--{mode}", file_path])
-            return True
-        except FileNotFoundError:
-            return False
-        except Exception as exc:
-            self.notify(f"LIBREOFFICE ERROR: {exc}", severity="error")
-            return True
-
-    def open_file_path(self, file_path: str) -> None:
-        if not os.path.exists(file_path):
-            self.notify(f"FILE NOT FOUND: {file_path}", severity="error")
-            return
-
-        office_mode = office_mode_for_file(file_path)
-        if office_mode is not None:
-            opened = self.open_with_libreoffice_mode(file_path, office_mode)
-            if opened:
-                self.notify(f"OPENED IN {office_mode.upper()}: {os.path.basename(file_path)}")
-                return
-
-        try:
-            if sys.platform.startswith("win"):
-                os.startfile(file_path)
-            elif sys.platform == "darwin":
-                subprocess.run(["open", file_path], check=False)
-            else:
-                subprocess.run(["xdg-open", file_path], check=False)
-
-            self.notify(f"OPENED: {os.path.basename(file_path)}")
-        except Exception as exc:
-            self.notify(f"OPEN FAILED: {exc}", severity="error")
-
-    def action_remove_attachment(self) -> None:
-        task = self.get_selected_task()
-        if not task:
-            self.notify("SELECT A TASK FIRST", severity="warning")
-            return
-
-        attachments = task.get("attachments", [])
-        if not attachments:
-            self.notify("NO ATTACHMENTS", severity="warning")
-            return
-
-        if len(attachments) == 1:
-            removed = attachments.pop()
-            save_projects(self.projects)
-            self.notify(f"REMOVED: {os.path.basename(removed)}")
-            return
-
-        self.push_screen(
-            AttachmentPickerScreen("REMOVE ATTACHMENT", attachments),
-            self.handle_remove_attachment_selection,
-        )
-
-    def handle_remove_attachment_selection(self, file_path: str | None) -> None:
-        if not file_path:
-            self.notify("REMOVE CANCELLED")
-            return
-
-        task = self.get_selected_task()
-        if not task:
-            self.notify("NO TASK SELECTED", severity="warning")
-            return
-
-        attachments = task.get("attachments", [])
-        if file_path not in attachments:
-            self.notify("FILE NO LONGER ATTACHED", severity="warning")
-            return
-
-        attachments.remove(file_path)
-        save_projects(self.projects)
-        self.notify(f"REMOVED: {os.path.basename(file_path)}")
 
     def action_previous_gantt_month(self) -> None:
         start_date, end_date = self.get_base_gantt_range()
