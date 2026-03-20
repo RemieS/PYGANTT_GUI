@@ -125,7 +125,8 @@ THEMES = {
 }
 
 
-CUSTOM_BANNERS_FILE = "custom_banners.txt"
+BASE_DIR = Path(__file__).resolve().parent
+CUSTOM_BANNERS_FILE = BASE_DIR / "custom_banners.txt"
 
 FALLBACK_BANNERS = [
     {
