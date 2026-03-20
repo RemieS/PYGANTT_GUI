@@ -1,6 +1,7 @@
 import os
 import sys
 import subprocess
+from math import sqrt
 from datetime import datetime, timedelta, date
 from calendar import monthrange
 from pathlib import Path
@@ -10,7 +11,7 @@ from textual.containers import Horizontal, Vertical, Container, ScrollableContai
 from textual.screen import ModalScreen
 from textual.widgets import Header, Footer, Tree, Static, Input, Button, Label, TextArea
 
-from .data import (
+from data import (
     load_projects,
     save_projects,
     add_project,
@@ -130,6 +131,7 @@ CUSTOM_BANNERS_FILE = BASE_DIR / "custom_banners.txt"
 
 FALLBACK_BANNERS = [
     {
+        "kind": "ascii",
         "name": "pygantt",
         "art": r"""
     ██████╗ ██╗   ██╗ ██████╗  █████╗ ███╗   ██╗████████╗████████╗
@@ -141,7 +143,6 @@ FALLBACK_BANNERS = [
         """,
     }
 ]
-
 
 LEFT_PANEL_WIDTH = 30
 MONTHS_VISIBLE = 4
@@ -164,7 +165,7 @@ def load_custom_banners(file_path: str = CUSTOM_BANNERS_FILE) -> list[dict]:
                 if current_name and current_lines:
                     art = "\n".join(current_lines).rstrip()
                     if art.strip():
-                        banners.append({"name": current_name, "art": art})
+                        banners.append({"kind": "ascii", "name": current_name, "art": art})
                 current_name = line.strip("= ").strip().lower()
                 current_lines = []
             else:
@@ -173,7 +174,7 @@ def load_custom_banners(file_path: str = CUSTOM_BANNERS_FILE) -> list[dict]:
     if current_name and current_lines:
         art = "\n".join(current_lines).rstrip()
         if art.strip():
-            banners.append({"name": current_name, "art": art})
+            banners.append({"kind": "ascii", "name": current_name, "art": art})
 
     return banners
 
@@ -260,6 +261,321 @@ def pad_label(text: str, width: int = LEFT_PANEL_WIDTH) -> str:
     return plain.ljust(width)
 
 
+def make_color_cell(color: str) -> str:
+    return f"[black on {color}]  [/]"
+
+
+def render_color_grid(grid: list[list[str]]) -> str:
+    return "\n".join("".join(make_color_cell(color) for color in row) for row in grid)
+
+
+def make_blank_grid(width: int, height: int, color: str) -> list[list[str]]:
+    return [[color for _ in range(width)] for _ in range(height)]
+
+
+def fill_rect(grid: list[list[str]], x1: int, y1: int, x2: int, y2: int, color: str) -> None:
+    height = len(grid)
+    width = len(grid[0])
+    x1 = max(0, x1)
+    y1 = max(0, y1)
+    x2 = min(width, x2)
+    y2 = min(height, y2)
+
+    for y in range(y1, y2):
+        for x in range(x1, x2):
+            grid[y][x] = color
+
+
+def point_in_triangle(px: float, py: float, a: tuple[float, float], b: tuple[float, float], c: tuple[float, float]) -> bool:
+    denom = ((b[1] - c[1]) * (a[0] - c[0]) + (c[0] - b[0]) * (a[1] - c[1]))
+    if denom == 0:
+        return False
+
+    w1 = ((b[1] - c[1]) * (px - c[0]) + (c[0] - b[0]) * (py - c[1])) / denom
+    w2 = ((c[1] - a[1]) * (px - c[0]) + (a[0] - c[0]) * (py - c[1])) / denom
+    w3 = 1 - w1 - w2
+    return w1 >= 0 and w2 >= 0 and w3 >= 0
+
+
+def draw_triangle(grid: list[list[str]], a: tuple[float, float], b: tuple[float, float], c: tuple[float, float], color: str) -> None:
+    height = len(grid)
+    width = len(grid[0])
+
+    min_x = max(0, int(min(a[0], b[0], c[0])))
+    max_x = min(width - 1, int(max(a[0], b[0], c[0])) + 1)
+    min_y = max(0, int(min(a[1], b[1], c[1])))
+    max_y = min(height - 1, int(max(a[1], b[1], c[1])) + 1)
+
+    for y in range(min_y, max_y + 1):
+        for x in range(min_x, max_x + 1):
+            if point_in_triangle(x + 0.5, y + 0.5, a, b, c):
+                grid[y][x] = color
+
+
+def draw_circle_ring(grid: list[list[str]], cx: float, cy: float, radius: float, thickness: float, color: str) -> None:
+    height = len(grid)
+    width = len(grid[0])
+
+    inner = max(0.0, radius - thickness)
+    outer = radius
+
+    for y in range(height):
+        for x in range(width):
+            dx = x + 0.5 - cx
+            dy = y + 0.5 - cy
+            dist = sqrt(dx * dx + dy * dy)
+            if inner <= dist <= outer:
+                grid[y][x] = color
+
+
+def draw_disc(grid: list[list[str]], cx: float, cy: float, radius: float, color: str) -> None:
+    height = len(grid)
+    width = len(grid[0])
+
+    for y in range(height):
+        for x in range(width):
+            dx = x + 0.5 - cx
+            dy = y + 0.5 - cy
+            dist = sqrt(dx * dx + dy * dy)
+            if dist <= radius:
+                grid[y][x] = color
+
+
+def draw_x_band(grid: list[list[str]], band_half_width: float, color: str) -> None:
+    height = len(grid)
+    width = len(grid[0])
+    if width <= 1 or height <= 1:
+        return
+
+    slope = (height - 1) / (width - 1)
+
+    for y in range(height):
+        for x in range(width):
+            d1 = abs(y - slope * x)
+            d2 = abs(y - ((height - 1) - slope * x))
+            if d1 <= band_half_width or d2 <= band_half_width:
+                grid[y][x] = color
+
+
+def build_progress_pride_flag(width: int = 44, height: int = 14) -> str:
+    red = "#e40203"
+    orange = "#ff8b00"
+    yellow = "#fedf01"
+    green = "#008127"
+    blue = "#004dff"
+    purple = "#760789"
+
+    white = "#ffffff"
+    pink = "#ff66ae"
+    trans_blue = "#6cccff"
+    brown = "#5b3715"
+    black = "#000000"
+    ring_purple = "#7b00a8"
+
+    grid = make_blank_grid(width, height, red)
+
+    stripe_colors = [red, orange, yellow, green, blue, purple]
+    stripe_height = height / len(stripe_colors)
+
+    for y in range(height):
+        idx = min(len(stripe_colors) - 1, int(y / stripe_height))
+        for x in range(width):
+            grid[y][x] = stripe_colors[idx]
+
+    chevrons = [
+        (white, 0.0, 0.42),
+        (pink, 0.0, 0.34),
+        (trans_blue, 0.0, 0.26),
+        (brown, 0.0, 0.18),
+        (black, 0.0, 0.10),
+    ]
+
+    for color, left_offset, apex_ratio in chevrons:
+        draw_triangle(
+            grid,
+            (left_offset, 0),
+            (width * apex_ratio, height / 2),
+            (left_offset, height),
+            color,
+        )
+
+    draw_triangle(
+        grid,
+        (0, height * 0.15),
+        (width * 0.12, height / 2),
+        (0, height * 0.85),
+        yellow,
+    )
+
+    draw_circle_ring(
+        grid,
+        cx=width * 0.08,
+        cy=height / 2,
+        radius=height * 0.18,
+        thickness=height * 0.06,
+        color=ring_purple,
+    )
+
+    return render_color_grid(grid)
+
+
+def build_green_x_flag(width: int = 44, height: int = 14) -> str:
+    dark_green = "#086224"
+    bright_green = "#01a850"
+    light_green = "#7ac043"
+    cream = "#f2e9cc"
+
+    grid = make_blank_grid(width, height, bright_green)
+
+    draw_triangle(grid, (0, 0), (width, 0), (width / 2, height / 2), light_green)
+    draw_triangle(grid, (0, height), (width, height), (width / 2, height / 2), light_green)
+
+    draw_x_band(grid, band_half_width=2.2, color=dark_green)
+    draw_x_band(grid, band_half_width=1.1, color=cream)
+
+    return render_color_grid(grid)
+
+
+def build_frisian_flag(width: int = 44, height: int = 14) -> str:
+    blue = "#0000ff"
+    white = "#ffffff"
+    red = "#ff0000"
+
+    grid = make_blank_grid(width, height, white)
+
+    band = 2.0
+    spacing = 6.0
+
+    for y in range(height):
+        for x in range(width):
+            diagonal = (x + y) / spacing
+            frac = diagonal - int(diagonal)
+            if frac < (band / spacing):
+                grid[y][x] = blue
+
+    heart_positions = [
+        (6, 3), (16, 5), (30, 2),
+        (10, 9), (24, 8), (35, 6),
+        (4, 7)
+    ]
+
+    for cx, cy in heart_positions:
+        draw_disc(grid, cx, cy, 1.1, red)
+        draw_triangle(grid, (cx - 0.8, cy + 0.2), (cx + 0.8, cy + 0.2), (cx, cy + 1.8), red)
+
+        if 0 <= int(cx) < width and 0 <= int(cy) < height:
+            grid[int(cy)][int(cx)] = white
+
+    return render_color_grid(grid)
+
+
+def build_palestine_flag(width: int = 44, height: int = 14) -> str:
+    black = "#000000"
+    white = "#ffffff"
+    green = "#009639"
+    red = "#ed2e38"
+
+    grid = make_blank_grid(width, height, black)
+
+    stripe_height = height // 3
+    fill_rect(grid, 0, 0, width, stripe_height, black)
+    fill_rect(grid, 0, stripe_height, width, stripe_height * 2, white)
+    fill_rect(grid, 0, stripe_height * 2, width, height, green)
+
+    draw_triangle(
+        grid,
+        (0, 0),
+        (width * 0.33, height / 2),
+        (0, height),
+        red,
+    )
+
+    return render_color_grid(grid)
+
+
+def build_png_flag(width: int = 44, height: int = 14) -> str:
+    black = "#000000"
+    red = "#c8102e"
+    yellow = "#ffcd00"
+    white = "#ffffff"
+
+    grid = make_blank_grid(width, height, black)
+
+    draw_triangle(grid, (0, 0), (width, 0), (width, height), red)
+
+    star_positions = [(5, 9), (9, 7), (13, 9), (10, 11), (6, 12)]
+    for cx, cy in star_positions:
+        draw_disc(grid, cx, cy, 0.7, white)
+
+    bird_points = [
+        (24, 3), (27, 1), (31, 2), (33, 4), (31, 5), (28, 5),
+        (26, 4), (25, 6), (28, 7), (31, 8), (29, 10), (27, 9),
+        (26, 7), (24, 6), (22, 5), (23, 4)
+    ]
+
+    min_x = min(p[0] for p in bird_points)
+    max_x = max(p[0] for p in bird_points)
+    min_y = min(p[1] for p in bird_points)
+    max_y = max(p[1] for p in bird_points)
+
+    for y in range(min_y, max_y + 1):
+        intersections = []
+        for i in range(len(bird_points)):
+            x1, y1 = bird_points[i]
+            x2, y2 = bird_points[(i + 1) % len(bird_points)]
+            if y1 == y2:
+                continue
+            if min(y1, y2) <= y < max(y1, y2):
+                x = x1 + (y - y1) * (x2 - x1) / (y2 - y1)
+                intersections.append(x)
+
+        intersections.sort()
+        for i in range(0, len(intersections), 2):
+            if i + 1 < len(intersections):
+                x_start = int(intersections[i])
+                x_end = int(intersections[i + 1])
+                for x in range(x_start, x_end + 1):
+                    if 0 <= x < width and 0 <= y < height:
+                        grid[y][x] = yellow
+
+    return render_color_grid(grid)
+
+
+def build_flag_assets() -> list[dict]:
+    return [
+        {
+            "kind": "flag",
+            "name": "progress_pride",
+            "art": build_progress_pride_flag(),
+            "subtitle": "Progress Pride Flag",
+        },
+        {
+            "kind": "flag",
+            "name": "green_x",
+            "art": build_green_x_flag(),
+            "subtitle": "Green X Flag",
+        },
+        {
+            "kind": "flag",
+            "name": "frisian",
+            "art": build_frisian_flag(),
+            "subtitle": "Frisian Flag",
+        },
+        {
+            "kind": "flag",
+            "name": "palestine",
+            "art": build_palestine_flag(),
+            "subtitle": "Palestine Flag",
+        },
+        {
+            "kind": "flag",
+            "name": "papua_new_guinea",
+            "art": build_png_flag(),
+            "subtitle": "Papua New Guinea Flag",
+        },
+    ]
+
+
 class Banner(Static):
     def on_mount(self) -> None:
         self.refresh_banner()
@@ -267,14 +583,19 @@ class Banner(Static):
     def refresh_banner(self) -> None:
         theme = self.app.theme_data
         banner_data = self.app.get_current_banner()
-        subtitle = "    A Python-based terminal Gantt-chart tool, by Remie Stronks"
+
+        default_subtitle = "    A Python-based terminal Gantt-chart tool, by Remie Stronks"
+        subtitle = banner_data.get("subtitle", default_subtitle)
+
+        art = banner_data.get("art", "").strip("\n")
 
         self.update(
             f"\n"
-            f"[bold {theme['banner']}]{banner_data['art']}[/]\n"
+            f"{art}\n"
             f"\n"
             f"[italic {theme['text']}]{subtitle}[/]\n"
         )
+
 
 class ConfirmScreen(ModalScreen[bool]):
     CSS = """
@@ -1212,18 +1533,19 @@ class PyGanttApp(App):
 
     #main {
         height: 1fr;
-        padding: 0 1 1 3;
+        padding: 0 1 1 1;
         background: black;
     }
-    
+
     #banner {
-        padding: 1 0 1 0;
+        padding: 1 1 1 2;
         margin-bottom: 1;
+        content-align: left middle;
     }
-    
+
     #lower-panels {
         height: 1fr;
-        align: left top;
+        align: center top;
         background: black;
     }
 
@@ -1295,7 +1617,7 @@ class PyGanttApp(App):
         ("]", "next_gantt_month", "NEXT VIEW"),
         ("0", "reset_gantt_month", "RESET VIEW"),
         ("p", "cycle_theme", "THEME"),
-        ("l", "cycle_logo", "LOGO"),
+        ("l", "cycle_logo", "LOGO / FLAG"),
         ("f", "attach_file", "ATTACH FILE"),
         ("o", "open_attachment", "OPEN FILE"),
         ("r", "remove_attachment", "REMOVE FILE"),
@@ -1316,7 +1638,9 @@ class PyGanttApp(App):
         self.theme_data = THEMES[self.theme_name]
 
         loaded_banners = load_custom_banners(CUSTOM_BANNERS_FILE)
-        self.banners = loaded_banners if loaded_banners else FALLBACK_BANNERS
+        ascii_assets = loaded_banners if loaded_banners else FALLBACK_BANNERS
+        flag_assets = build_flag_assets()
+        self.banners = ascii_assets + flag_assets
 
         self.banner_index = 0
         for i, banner in enumerate(self.banners):
@@ -2046,7 +2370,8 @@ class PyGanttApp(App):
             return
         self.banner_index = (self.banner_index + 1) % len(self.banners)
         self.query_one("#banner", Banner).refresh_banner()
-        self.notify("LOGO CHANGED")
+        current = self.get_current_banner()
+        self.notify(f"DISPLAY = {current.get('name', 'UNKNOWN').upper()}")
 
     def toggle_project_in_gantt(self, project_name: str | None) -> None:
         if not project_name or project_name not in self.projects:
