@@ -1,7 +1,6 @@
 import os
 import sys
 import subprocess
-from math import sqrt
 from datetime import datetime, timedelta, date
 from calendar import monthrange
 from pathlib import Path
@@ -34,14 +33,21 @@ THEMES = {
         "task_bar_1": "#0b6ea8",
         "task_bar_2": "#1294d8",
         "current_day": "#39ff14",
-        "text": "white",
-        "background": "#000000",
         "accent_ok": "#39ff14",
         "accent_warn": "#ffea00",
         "accent_bad": "#ff5555",
         "project_header": "#00f0ff",
         "selection": "#ff00d4",
-        "weekend_dim": "#1a1a1a",
+        "text_dark": "white",
+        "text_light": "black",
+        "background_dark": "#000000",
+        "background_light": "#ffffff",
+        "surface_dark": "#0a0f14",
+        "surface_light": "#f7fbff",
+        "panel_dark": "#05080d",
+        "panel_light": "#eef7ff",
+        "weekend_dim_dark": "#7a7a7a",
+        "weekend_dim_light": "#b8b8b8",
     },
     "ice_neon": {
         "banner": "#6fffe9",
@@ -50,14 +56,21 @@ THEMES = {
         "task_bar_1": "#00bbf9",
         "task_bar_2": "#9b5de5",
         "current_day": "#39ff14",
-        "text": "white",
-        "background": "#000000",
         "accent_ok": "#39ff14",
         "accent_warn": "#ffea00",
         "accent_bad": "#ff5555",
         "project_header": "#6fffe9",
         "selection": "#9b5de5",
-        "weekend_dim": "#1a1a1a",
+        "text_dark": "white",
+        "text_light": "black",
+        "background_dark": "#000000",
+        "background_light": "#ffffff",
+        "surface_dark": "#0b1719",
+        "surface_light": "#f7ffff",
+        "panel_dark": "#071214",
+        "panel_light": "#eefcff",
+        "weekend_dim_dark": "#7a7a7a",
+        "weekend_dim_light": "#b8b8b8",
     },
     "acid_green": {
         "banner": "#39ff14",
@@ -66,14 +79,21 @@ THEMES = {
         "task_bar_1": "#39ff14",
         "task_bar_2": "#ffea00",
         "current_day": "#ffffff",
-        "text": "white",
-        "background": "#000000",
         "accent_ok": "#39ff14",
         "accent_warn": "#ffea00",
         "accent_bad": "#ff5555",
         "project_header": "#39ff14",
         "selection": "#ffea00",
-        "weekend_dim": "#1a1a1a",
+        "text_dark": "white",
+        "text_light": "black",
+        "background_dark": "#000000",
+        "background_light": "#ffffff",
+        "surface_dark": "#0b1408",
+        "surface_light": "#fbfff6",
+        "panel_dark": "#071005",
+        "panel_light": "#f2ffe9",
+        "weekend_dim_dark": "#7a7a7a",
+        "weekend_dim_light": "#b8b8b8",
     },
     "bw_night": {
         "banner": "white",
@@ -82,14 +102,21 @@ THEMES = {
         "task_bar_1": "white",
         "task_bar_2": "#999999",
         "current_day": "#39ff14",
-        "text": "white",
-        "background": "#000000",
         "accent_ok": "white",
         "accent_warn": "#bbbbbb",
         "accent_bad": "#777777",
         "project_header": "white",
         "selection": "#bbbbbb",
-        "weekend_dim": "#1a1a1a",
+        "text_dark": "white",
+        "text_light": "black",
+        "background_dark": "#000000",
+        "background_light": "#ffffff",
+        "surface_dark": "#111111",
+        "surface_light": "#f5f5f5",
+        "panel_dark": "#0a0a0a",
+        "panel_light": "#eeeeee",
+        "weekend_dim_dark": "#7a7a7a",
+        "weekend_dim_light": "#b8b8b8",
     },
     "bw_day": {
         "banner": "black",
@@ -98,14 +125,21 @@ THEMES = {
         "task_bar_1": "black",
         "task_bar_2": "#666666",
         "current_day": "#00aa00",
-        "text": "black",
-        "background": "#ffffff",
         "accent_ok": "#006600",
         "accent_warn": "#666600",
         "accent_bad": "#aa0000",
         "project_header": "black",
         "selection": "#666666",
-        "weekend_dim": "#dddddd",
+        "text_dark": "white",
+        "text_light": "black",
+        "background_dark": "#000000",
+        "background_light": "#ffffff",
+        "surface_dark": "#1a1a1a",
+        "surface_light": "#ffffff",
+        "panel_dark": "#111111",
+        "panel_light": "#f4f4f4",
+        "weekend_dim_dark": "#7a7a7a",
+        "weekend_dim_light": "#b8b8b8",
     },
     "amber_term": {
         "banner": "#ffbf00",
@@ -114,17 +148,23 @@ THEMES = {
         "task_bar_1": "#ffbf00",
         "task_bar_2": "#ff9f1c",
         "current_day": "#ffffff",
-        "text": "#ffdf80",
-        "background": "#120d00",
         "accent_ok": "#ffdf80",
         "accent_warn": "#ffbf00",
         "accent_bad": "#ff7b00",
         "project_header": "#ffbf00",
         "selection": "#ff9f1c",
-        "weekend_dim": "#2a1d00",
+        "text_dark": "#ffdf80",
+        "text_light": "#5a3c00",
+        "background_dark": "#120d00",
+        "background_light": "#fff9ed",
+        "surface_dark": "#1b1300",
+        "surface_light": "#fffdf6",
+        "panel_dark": "#120d00",
+        "panel_light": "#fff3d6",
+        "weekend_dim_dark": "#a38239",
+        "weekend_dim_light": "#d7bf77",
     },
 }
-
 
 BASE_DIR = Path(__file__).resolve().parent
 CUSTOM_BANNERS_FILE = BASE_DIR / "custom_banners.txt"
@@ -147,6 +187,16 @@ FALLBACK_BANNERS = [
 LEFT_PANEL_WIDTH = 30
 MONTHS_VISIBLE = 4
 TIMELINE_CELL_WIDTH = 2
+
+MODAL_WIDTH_SMALL = 60
+MODAL_WIDTH_MEDIUM = 72
+MODAL_WIDTH_LARGE = 90
+MODAL_WIDTH_XL = 116
+
+MODAL_HEIGHT_CONFIRM = 14
+MODAL_HEIGHT_INPUT = 15
+MODAL_HEIGHT_EDITOR = 25
+MODAL_HEIGHT_BROWSER = 38
 
 
 def load_custom_banners(file_path: str = CUSTOM_BANNERS_FILE) -> list[dict]:
@@ -261,327 +311,12 @@ def pad_label(text: str, width: int = LEFT_PANEL_WIDTH) -> str:
     return plain.ljust(width)
 
 
-def make_color_cell(color: str) -> str:
-    return f"[black on {color}]  [/]"
-
-
-def render_color_grid(grid: list[list[str]]) -> str:
-    return "\n".join("".join(make_color_cell(color) for color in row) for row in grid)
-
-
-def make_blank_grid(width: int, height: int, color: str) -> list[list[str]]:
-    return [[color for _ in range(width)] for _ in range(height)]
-
-
-def fill_rect(grid: list[list[str]], x1: int, y1: int, x2: int, y2: int, color: str) -> None:
-    height = len(grid)
-    width = len(grid[0])
-    x1 = max(0, x1)
-    y1 = max(0, y1)
-    x2 = min(width, x2)
-    y2 = min(height, y2)
-
-    for y in range(y1, y2):
-        for x in range(x1, x2):
-            grid[y][x] = color
-
-
-def point_in_triangle(px: float, py: float, a: tuple[float, float], b: tuple[float, float], c: tuple[float, float]) -> bool:
-    denom = ((b[1] - c[1]) * (a[0] - c[0]) + (c[0] - b[0]) * (a[1] - c[1]))
-    if denom == 0:
-        return False
-
-    w1 = ((b[1] - c[1]) * (px - c[0]) + (c[0] - b[0]) * (py - c[1])) / denom
-    w2 = ((c[1] - a[1]) * (px - c[0]) + (a[0] - c[0]) * (py - c[1])) / denom
-    w3 = 1 - w1 - w2
-    return w1 >= 0 and w2 >= 0 and w3 >= 0
-
-
-def draw_triangle(grid: list[list[str]], a: tuple[float, float], b: tuple[float, float], c: tuple[float, float], color: str) -> None:
-    height = len(grid)
-    width = len(grid[0])
-
-    min_x = max(0, int(min(a[0], b[0], c[0])))
-    max_x = min(width - 1, int(max(a[0], b[0], c[0])) + 1)
-    min_y = max(0, int(min(a[1], b[1], c[1])))
-    max_y = min(height - 1, int(max(a[1], b[1], c[1])) + 1)
-
-    for y in range(min_y, max_y + 1):
-        for x in range(min_x, max_x + 1):
-            if point_in_triangle(x + 0.5, y + 0.5, a, b, c):
-                grid[y][x] = color
-
-
-def draw_circle_ring(grid: list[list[str]], cx: float, cy: float, radius: float, thickness: float, color: str) -> None:
-    height = len(grid)
-    width = len(grid[0])
-
-    inner = max(0.0, radius - thickness)
-    outer = radius
-
-    for y in range(height):
-        for x in range(width):
-            dx = x + 0.5 - cx
-            dy = y + 0.5 - cy
-            dist = sqrt(dx * dx + dy * dy)
-            if inner <= dist <= outer:
-                grid[y][x] = color
-
-
-def draw_disc(grid: list[list[str]], cx: float, cy: float, radius: float, color: str) -> None:
-    height = len(grid)
-    width = len(grid[0])
-
-    for y in range(height):
-        for x in range(width):
-            dx = x + 0.5 - cx
-            dy = y + 0.5 - cy
-            dist = sqrt(dx * dx + dy * dy)
-            if dist <= radius:
-                grid[y][x] = color
-
-
-def draw_x_band(grid: list[list[str]], band_half_width: float, color: str) -> None:
-    height = len(grid)
-    width = len(grid[0])
-    if width <= 1 or height <= 1:
-        return
-
-    slope = (height - 1) / (width - 1)
-
-    for y in range(height):
-        for x in range(width):
-            d1 = abs(y - slope * x)
-            d2 = abs(y - ((height - 1) - slope * x))
-            if d1 <= band_half_width or d2 <= band_half_width:
-                grid[y][x] = color
-
-
-def build_progress_pride_flag(width: int = 44, height: int = 14) -> str:
-    red = "#e40203"
-    orange = "#ff8b00"
-    yellow = "#fedf01"
-    green = "#008127"
-    blue = "#004dff"
-    purple = "#760789"
-
-    white = "#ffffff"
-    pink = "#ff66ae"
-    trans_blue = "#6cccff"
-    brown = "#5b3715"
-    black = "#000000"
-    ring_purple = "#7b00a8"
-
-    grid = make_blank_grid(width, height, red)
-
-    stripe_colors = [red, orange, yellow, green, blue, purple]
-    stripe_height = height / len(stripe_colors)
-
-    for y in range(height):
-        idx = min(len(stripe_colors) - 1, int(y / stripe_height))
-        for x in range(width):
-            grid[y][x] = stripe_colors[idx]
-
-    chevrons = [
-        (white, 0.0, 0.42),
-        (pink, 0.0, 0.34),
-        (trans_blue, 0.0, 0.26),
-        (brown, 0.0, 0.18),
-        (black, 0.0, 0.10),
-    ]
-
-    for color, left_offset, apex_ratio in chevrons:
-        draw_triangle(
-            grid,
-            (left_offset, 0),
-            (width * apex_ratio, height / 2),
-            (left_offset, height),
-            color,
-        )
-
-    draw_triangle(
-        grid,
-        (0, height * 0.15),
-        (width * 0.12, height / 2),
-        (0, height * 0.85),
-        yellow,
-    )
-
-    draw_circle_ring(
-        grid,
-        cx=width * 0.08,
-        cy=height / 2,
-        radius=height * 0.18,
-        thickness=height * 0.06,
-        color=ring_purple,
-    )
-
-    return render_color_grid(grid)
-
-
-def build_green_x_flag(width: int = 44, height: int = 14) -> str:
-    dark_green = "#086224"
-    bright_green = "#01a850"
-    light_green = "#7ac043"
-    cream = "#f2e9cc"
-
-    grid = make_blank_grid(width, height, bright_green)
-
-    draw_triangle(grid, (0, 0), (width, 0), (width / 2, height / 2), light_green)
-    draw_triangle(grid, (0, height), (width, height), (width / 2, height / 2), light_green)
-
-    draw_x_band(grid, band_half_width=2.2, color=dark_green)
-    draw_x_band(grid, band_half_width=1.1, color=cream)
-
-    return render_color_grid(grid)
-
-
-def build_frisian_flag(width: int = 44, height: int = 14) -> str:
-    blue = "#0000ff"
-    white = "#ffffff"
-    red = "#ff0000"
-
-    grid = make_blank_grid(width, height, white)
-
-    band = 2.0
-    spacing = 6.0
-
-    for y in range(height):
-        for x in range(width):
-            diagonal = (x + y) / spacing
-            frac = diagonal - int(diagonal)
-            if frac < (band / spacing):
-                grid[y][x] = blue
-
-    heart_positions = [
-        (6, 3), (16, 5), (30, 2),
-        (10, 9), (24, 8), (35, 6),
-        (4, 7)
-    ]
-
-    for cx, cy in heart_positions:
-        draw_disc(grid, cx, cy, 1.1, red)
-        draw_triangle(grid, (cx - 0.8, cy + 0.2), (cx + 0.8, cy + 0.2), (cx, cy + 1.8), red)
-
-        if 0 <= int(cx) < width and 0 <= int(cy) < height:
-            grid[int(cy)][int(cx)] = white
-
-    return render_color_grid(grid)
-
-
-def build_palestine_flag(width: int = 44, height: int = 14) -> str:
-    black = "#000000"
-    white = "#ffffff"
-    green = "#009639"
-    red = "#ed2e38"
-
-    grid = make_blank_grid(width, height, black)
-
-    stripe_height = height // 3
-    fill_rect(grid, 0, 0, width, stripe_height, black)
-    fill_rect(grid, 0, stripe_height, width, stripe_height * 2, white)
-    fill_rect(grid, 0, stripe_height * 2, width, height, green)
-
-    draw_triangle(
-        grid,
-        (0, 0),
-        (width * 0.33, height / 2),
-        (0, height),
-        red,
-    )
-
-    return render_color_grid(grid)
-
-
-def build_png_flag(width: int = 44, height: int = 14) -> str:
-    black = "#000000"
-    red = "#c8102e"
-    yellow = "#ffcd00"
-    white = "#ffffff"
-
-    grid = make_blank_grid(width, height, black)
-
-    draw_triangle(grid, (0, 0), (width, 0), (width, height), red)
-
-    star_positions = [(5, 9), (9, 7), (13, 9), (10, 11), (6, 12)]
-    for cx, cy in star_positions:
-        draw_disc(grid, cx, cy, 0.7, white)
-
-    bird_points = [
-        (24, 3), (27, 1), (31, 2), (33, 4), (31, 5), (28, 5),
-        (26, 4), (25, 6), (28, 7), (31, 8), (29, 10), (27, 9),
-        (26, 7), (24, 6), (22, 5), (23, 4)
-    ]
-
-    min_x = min(p[0] for p in bird_points)
-    max_x = max(p[0] for p in bird_points)
-    min_y = min(p[1] for p in bird_points)
-    max_y = max(p[1] for p in bird_points)
-
-    for y in range(min_y, max_y + 1):
-        intersections = []
-        for i in range(len(bird_points)):
-            x1, y1 = bird_points[i]
-            x2, y2 = bird_points[(i + 1) % len(bird_points)]
-            if y1 == y2:
-                continue
-            if min(y1, y2) <= y < max(y1, y2):
-                x = x1 + (y - y1) * (x2 - x1) / (y2 - y1)
-                intersections.append(x)
-
-        intersections.sort()
-        for i in range(0, len(intersections), 2):
-            if i + 1 < len(intersections):
-                x_start = int(intersections[i])
-                x_end = int(intersections[i + 1])
-                for x in range(x_start, x_end + 1):
-                    if 0 <= x < width and 0 <= y < height:
-                        grid[y][x] = yellow
-
-    return render_color_grid(grid)
-
-
-def build_flag_assets() -> list[dict]:
-    return [
-        {
-            "kind": "flag",
-            "name": "progress_pride",
-            "art": build_progress_pride_flag(),
-            "subtitle": "\nProgress Pride Flag",
-        },
-        {
-            "kind": "flag",
-            "name": "green_x",
-            "art": build_green_x_flag(),
-            "subtitle": "\nAchterhoek Flag",
-        },
-        {
-            "kind": "flag",
-            "name": "frisian",
-            "art": build_frisian_flag(),
-            "subtitle": "\nFrisian Flag",
-        },
-        {
-            "kind": "flag",
-            "name": "palestine",
-            "art": build_palestine_flag(),
-            "subtitle": "\nPalestine Flag",
-        },
-        {
-            "kind": "flag",
-            "name": "papua_new_guinea",
-            "art": build_png_flag(),
-            "subtitle": "\nPapua New Guinea Flag",
-        },
-    ]
-
-
 class Banner(Static):
     def on_mount(self) -> None:
         self.refresh_banner()
 
     def refresh_banner(self) -> None:
-        theme = self.app.theme_data
+        theme = getattr(self.app, "theme_data", None) or self.app.build_theme_data()
         banner_data = self.app.get_current_banner()
 
         default_subtitle = "    A Python-based terminal Gantt-chart tool, by Remie Stronks"
@@ -596,38 +331,37 @@ class Banner(Static):
             f"[italic {theme['text']}]{subtitle}[/]\n"
         )
 
+
 class ConfirmScreen(ModalScreen[bool]):
-    CSS = """
-    ConfirmScreen {
+    CSS = f"""
+    ConfirmScreen {{
         align: center middle;
-    }
-    #dialog {
-        width: 70;
-        height: 11;
-        padding: 1 2;
+    }}
+    #dialog {{
+        width: {MODAL_WIDTH_MEDIUM};
+        height: {MODAL_HEIGHT_CONFIRM};
+        padding: 1 2 1 2;
         border: round red;
-        background: black;
-        color: white;
-    }
-    #dialog_title {
+    }}
+    #dialog_title {{
         text-style: bold;
-        content-align: center middle;
+        content-align: left middle;
         height: 1;
         margin-bottom: 1;
-    }
-    #dialog_message {
-        content-align: center middle;
+    }}
+    #dialog_message {{
+        content-align: left middle;
         height: 3;
         margin-bottom: 1;
-    }
-    #dialog_buttons {
-        height: auto;
+    }}
+    #dialog_buttons {{
+        height: 3;
         align: center middle;
-    }
-    Button {
+    }}
+    Button {{
         margin: 0 1;
         min-width: 12;
-    }
+    }}
     """
 
     def __init__(self, title: str, message: str):
@@ -643,39 +377,41 @@ class ConfirmScreen(ModalScreen[bool]):
                 yield Button("YES", variant="error", id="confirm")
                 yield Button("NO", id="cancel")
 
+    def on_mount(self) -> None:
+        self.app.style_modal(self)
+
     def on_button_pressed(self, event: Button.Pressed) -> None:
         self.dismiss(event.button.id == "confirm")
 
 
 class AddProjectScreen(ModalScreen[str | None]):
-    CSS = """
-    AddProjectScreen {
+    CSS = f"""
+    AddProjectScreen {{
         align: center middle;
-    }
-    #dialog {
-        width: 60;
-        height: 12;
-        padding: 1 2;
+    }}
+    #dialog {{
+        width: {MODAL_WIDTH_SMALL};
+        height: {MODAL_HEIGHT_INPUT};
+        padding: 1 2 1 2;
         border: round cyan;
-        background: $surface;
-    }
-    #dialog_title {
-        content-align: center middle;
+    }}
+    #dialog_title {{
+        content-align: left middle;
         height: 1;
         margin-bottom: 1;
         text-style: bold;
-    }
-    #project_name_input {
+    }}
+    #project_name_input {{
         margin-bottom: 1;
-    }
-    #dialog_buttons {
-        height: auto;
+    }}
+    #dialog_buttons {{
+        height: 3;
         align: center middle;
-    }
-    Button {
+    }}
+    Button {{
         margin: 0 1;
         min-width: 12;
-    }
+    }}
     """
 
     BINDINGS = [("escape", "cancel_dialog", "CANCEL")]
@@ -689,6 +425,7 @@ class AddProjectScreen(ModalScreen[str | None]):
                 yield Button("CANCEL", id="cancel")
 
     def on_mount(self) -> None:
+        self.app.style_modal(self)
         self.query_one("#project_name_input", Input).focus()
 
     def action_cancel_dialog(self) -> None:
@@ -707,34 +444,33 @@ class AddProjectScreen(ModalScreen[str | None]):
 
 
 class TaskEditorScreen(ModalScreen[dict | None]):
-    CSS = """
-    TaskEditorScreen {
+    CSS = f"""
+    TaskEditorScreen {{
         align: center middle;
-    }
-    #dialog {
-        width: 72;
-        height: 22;
-        padding: 1 2;
+    }}
+    #dialog {{
+        width: {MODAL_WIDTH_MEDIUM};
+        height: {MODAL_HEIGHT_EDITOR};
+        padding: 1 2 1 2;
         border: round green;
-        background: $surface;
-    }
-    #dialog_title {
-        content-align: center middle;
+    }}
+    #dialog_title {{
+        content-align: left middle;
         height: 1;
         margin-bottom: 1;
         text-style: bold;
-    }
-    Input {
+    }}
+    Input {{
         margin-bottom: 1;
-    }
-    #dialog_buttons {
-        height: auto;
+    }}
+    #dialog_buttons {{
+        height: 3;
         align: center middle;
-    }
-    Button {
+    }}
+    Button {{
         margin: 0 1;
         min-width: 12;
-    }
+    }}
     """
 
     BINDINGS = [("escape", "cancel_dialog", "CANCEL")]
@@ -756,6 +492,7 @@ class TaskEditorScreen(ModalScreen[dict | None]):
                 yield Button("CANCEL", id="cancel")
 
     def on_mount(self) -> None:
+        self.app.style_modal(self)
         self.query_one("#task_name_input", Input).focus()
 
     def action_cancel_dialog(self) -> None:
@@ -816,13 +553,12 @@ class ExportScreen(ModalScreen[str | None]):
     }
     #dialog {
         width: 100;
-        height: 15;
-        padding: 1 2;
+        height: 17;
+        padding: 1 2 1 2;
         border: round green;
-        background: $surface;
     }
     #dialog_title {
-        content-align: center middle;
+        content-align: left middle;
         height: 1;
         margin-bottom: 1;
         text-style: bold;
@@ -830,13 +566,13 @@ class ExportScreen(ModalScreen[str | None]):
     #dialog_help {
         height: 2;
         margin-bottom: 1;
-        content-align: center middle;
+        content-align: left middle;
     }
     #file_path_input {
         margin-bottom: 1;
     }
     #dialog_buttons {
-        height: auto;
+        height: 3;
         align: center middle;
     }
     Button {
@@ -861,6 +597,7 @@ class ExportScreen(ModalScreen[str | None]):
                 yield Button("CANCEL", id="cancel")
 
     def on_mount(self) -> None:
+        self.app.style_modal(self)
         self.query_one("#file_path_input", Input).focus()
 
     def action_cancel_dialog(self) -> None:
@@ -885,13 +622,12 @@ class AttachFileScreen(ModalScreen[str | None]):
     }
     #dialog {
         width: 80;
-        height: 12;
-        padding: 1 2;
+        height: 15;
+        padding: 1 2 1 2;
         border: round yellow;
-        background: $surface;
     }
     #dialog_title {
-        content-align: center middle;
+        content-align: left middle;
         height: 1;
         margin-bottom: 1;
         text-style: bold;
@@ -900,7 +636,7 @@ class AttachFileScreen(ModalScreen[str | None]):
         margin-bottom: 1;
     }
     #dialog_buttons {
-        height: auto;
+        height: 3;
         align: center middle;
     }
     Button {
@@ -908,6 +644,8 @@ class AttachFileScreen(ModalScreen[str | None]):
         min-width: 12;
     }
     """
+
+    BINDINGS = [("escape", "cancel_dialog", "CANCEL")]
 
     def compose(self) -> ComposeResult:
         with Container(id="dialog"):
@@ -918,7 +656,11 @@ class AttachFileScreen(ModalScreen[str | None]):
                 yield Button("CANCEL", id="cancel")
 
     def on_mount(self) -> None:
+        self.app.style_modal(self)
         self.query_one("#file_path_input", Input).focus()
+
+    def action_cancel_dialog(self) -> None:
+        self.dismiss(None)
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "cancel":
@@ -938,25 +680,24 @@ class AttachMethodScreen(ModalScreen[str | None]):
         align: center middle;
     }
     #dialog {
-        width: 56;
-        height: 13;
-        padding: 1 2;
+        width: 60;
+        height: 15;
+        padding: 1 2 1 2;
         border: round green;
-        background: $surface;
     }
     #dialog_title {
-        content-align: center middle;
+        content-align: left middle;
         text-style: bold;
         height: 1;
         margin-bottom: 1;
     }
     #dialog_message {
-        content-align: center middle;
+        content-align: left middle;
         height: 2;
         margin-bottom: 1;
     }
     #dialog_buttons {
-        height: auto;
+        height: 3;
         align: center middle;
     }
     Button {
@@ -964,6 +705,8 @@ class AttachMethodScreen(ModalScreen[str | None]):
         min-width: 14;
     }
     """
+
+    BINDINGS = [("escape", "cancel_dialog", "CANCEL")]
 
     def compose(self) -> ComposeResult:
         with Container(id="dialog"):
@@ -973,6 +716,12 @@ class AttachMethodScreen(ModalScreen[str | None]):
                 yield Button("ENTER PATH", variant="success", id="path")
                 yield Button("BROWSE", id="browse")
                 yield Button("CANCEL", id="cancel")
+
+    def on_mount(self) -> None:
+        self.app.style_modal(self)
+
+    def action_cancel_dialog(self) -> None:
+        self.dismiss(None)
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "cancel":
@@ -990,24 +739,22 @@ class AttachmentPickerScreen(ModalScreen[str | None]):
     }
     #dialog {
         width: 90;
-        height: 22;
-        padding: 1 2;
+        height: 24;
+        padding: 1 2 1 2;
         border: round cyan;
-        background: $surface;
     }
     #dialog_title {
-        content-align: center middle;
+        content-align: left middle;
         text-style: bold;
         height: 1;
         margin-bottom: 1;
     }
     #attachment_tree {
         height: 1fr;
-        border: solid white;
         margin-bottom: 1;
     }
     #dialog_buttons {
-        height: auto;
+        height: 3;
         align: center middle;
     }
     Button {
@@ -1015,6 +762,8 @@ class AttachmentPickerScreen(ModalScreen[str | None]):
         min-width: 12;
     }
     """
+
+    BINDINGS = [("escape", "cancel_dialog", "CANCEL")]
 
     def __init__(self, title: str, attachments: list[str]):
         super().__init__()
@@ -1030,6 +779,7 @@ class AttachmentPickerScreen(ModalScreen[str | None]):
                 yield Button("CANCEL", id="cancel")
 
     def on_mount(self) -> None:
+        self.app.style_modal(self)
         tree = self.query_one("#attachment_tree", Tree)
         root = tree.root
         root.expand()
@@ -1042,6 +792,9 @@ class AttachmentPickerScreen(ModalScreen[str | None]):
         if root.children:
             tree.select_node(root.children[0])
         tree.focus()
+
+    def action_cancel_dialog(self) -> None:
+        self.dismiss(None)
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "cancel":
@@ -1057,50 +810,49 @@ class AttachmentPickerScreen(ModalScreen[str | None]):
 
 
 class FileBrowserScreen(ModalScreen[str | None]):
-    CSS = """
-    FileBrowserScreen {
+    CSS = f"""
+    FileBrowserScreen {{
         align: center middle;
-    }
-    #dialog {
-        width: 116;
-        height: 34;
-        padding: 1 2;
+    }}
+    #dialog {{
+        width: {MODAL_WIDTH_XL};
+        height: {MODAL_HEIGHT_BROWSER};
+        padding: 1 2 1 2;
         border: round yellow;
-        background: $surface;
-    }
-    #dialog_title {
-        content-align: center middle;
+    }}
+    #dialog_title {{
+        content-align: left middle;
         text-style: bold;
         height: 1;
         margin-bottom: 1;
-    }
-    #current_path {
+    }}
+    #current_path {{
         height: 2;
         margin-bottom: 1;
-    }
-    #filter_line {
-        height: 2;
+    }}
+    #filter_line {{
+        height: 1;
         margin-bottom: 1;
-    }
-    #browser_tree {
+    }}
+    #browser_tree {{
         height: 1fr;
-        border: solid white;
         margin-bottom: 1;
-    }
-    #dialog_buttons {
-        height: auto;
+    }}
+    #dialog_buttons {{
+        height: 3;
         align: center middle;
-    }
-    Button {
+    }}
+    Button {{
         margin: 0 1;
         min-width: 11;
-    }
+    }}
     """
 
     BINDINGS = [
         ("backspace", "go_up", "UP"),
         ("h", "toggle_hidden", "HIDDEN"),
         ("enter", "activate_selection", "OPEN/SELECT"),
+        ("escape", "cancel_dialog", "CANCEL"),
     ]
 
     def __init__(self, start_path: str | None = None):
@@ -1127,8 +879,12 @@ class FileBrowserScreen(ModalScreen[str | None]):
                 yield Button("CANCEL", id="cancel")
 
     def on_mount(self) -> None:
+        self.app.style_modal(self)
         self.refresh_browser()
         self.query_one("#browser_tree", Tree).focus()
+
+    def action_cancel_dialog(self) -> None:
+        self.dismiss(None)
 
     def matches_filter(self, filename: str) -> bool:
         ext = os.path.splitext(filename)[1].lower()
@@ -1278,9 +1034,8 @@ class TaskWorkspaceScreen(ModalScreen[dict | None]):
 
     #workspace_dialog {
         width: 140;
-        height: 40;
+        height: 42;
         border: round green;
-        background: $surface;
         padding: 1;
         layout: vertical;
     }
@@ -1324,13 +1079,13 @@ class TaskWorkspaceScreen(ModalScreen[dict | None]):
 
     #todo_tree {
         height: 1fr;
-        border: solid white;
         margin-bottom: 1;
     }
 
     #todo_buttons {
-        height: auto;
+        height: 3;
         margin-top: 1;
+        align: center middle;
     }
 
     #notes_header {
@@ -1345,7 +1100,6 @@ class TaskWorkspaceScreen(ModalScreen[dict | None]):
 
     #notes_area {
         height: 1fr;
-        border: solid white;
     }
 
     #workspace_buttons {
@@ -1420,6 +1174,7 @@ class TaskWorkspaceScreen(ModalScreen[dict | None]):
                 yield Button("CLOSE", id="close")
 
     def on_mount(self) -> None:
+        self.app.style_modal(self)
         notes_area = self.query_one("#notes_area", TextArea)
         try:
             notes_area.load_text(self.notes)
@@ -1527,13 +1282,11 @@ class PyGanttApp(App):
     CSS = """
     Screen {
         layout: vertical;
-        background: black;
     }
 
     #main {
         height: 1fr;
         padding: 0 1 1 1;
-        background: black;
     }
 
     #banner {
@@ -1545,14 +1298,12 @@ class PyGanttApp(App):
     #lower-panels {
         height: 1fr;
         align: center top;
-        background: black;
     }
 
     #projects-panel {
         width: 34;
         min-width: 28;
         height: 1fr;
-        border: solid white;
         margin-right: 1;
     }
 
@@ -1565,7 +1316,6 @@ class PyGanttApp(App):
         width: 32;
         min-width: 32;
         height: 1fr;
-        border: solid magenta;
         margin-right: 1;
     }
 
@@ -1586,7 +1336,6 @@ class PyGanttApp(App):
         width: 1fr;
         min-width: 80;
         height: 1fr;
-        border: solid cyan;
     }
 
     #gantt-timeline-scroll {
@@ -1602,6 +1351,10 @@ class PyGanttApp(App):
         height: auto;
         padding: 1;
     }
+
+    #bottom-spacer {
+        height: 1;
+    }
     """
 
     BINDINGS = [
@@ -1616,6 +1369,7 @@ class PyGanttApp(App):
         ("]", "next_gantt_month", "NEXT VIEW"),
         ("0", "reset_gantt_month", "RESET VIEW"),
         ("p", "cycle_theme", "THEME"),
+        ("b", "toggle_background", "BG"),
         ("l", "cycle_logo", "LOGO"),
         ("f", "attach_file", "ATTACH FILE"),
         ("o", "open_attachment", "OPEN FILE"),
@@ -1634,7 +1388,8 @@ class PyGanttApp(App):
 
         self.theme_names = list(THEMES.keys())
         self.theme_name = "retro_neon"
-        self.theme_data = THEMES[self.theme_name]
+        self.background_mode = "dark"
+        self.theme_data = self.build_theme_data()
 
         loaded_banners = load_custom_banners(CUSTOM_BANNERS_FILE)
         self.banners = loaded_banners if loaded_banners else FALLBACK_BANNERS
@@ -1650,6 +1405,19 @@ class PyGanttApp(App):
                 task.setdefault("attachments", [])
                 task.setdefault("notes", "")
                 task.setdefault("todos", [])
+
+    def build_theme_data(self) -> dict:
+        base = THEMES[self.theme_name]
+        dark = self.background_mode == "dark"
+
+        return {
+            **base,
+            "text": base["text_dark"] if dark else base["text_light"],
+            "background": base["background_dark"] if dark else base["background_light"],
+            "surface": base["surface_dark"] if dark else base["surface_light"],
+            "panel": base["panel_dark"] if dark else base["panel_light"],
+            "weekend_dim": base["weekend_dim_dark"] if dark else base["weekend_dim_light"],
+        }
 
     def get_current_banner(self) -> dict:
         return self.banners[self.banner_index]
@@ -1677,44 +1445,116 @@ class PyGanttApp(App):
         yield Footer()
 
     def on_mount(self) -> None:
-        self.refresh_project_tree()
         self.apply_theme()
+        self.refresh_project_tree()
         self.refresh_gantt_view()
 
     def on_resize(self) -> None:
         self.refresh_gantt_view()
 
+    def style_tree(self, tree: Tree) -> None:
+        theme = self.theme_data
+        tree.styles.background = theme["surface"]
+        tree.styles.color = theme["text"]
+        tree.styles.border = ("solid", theme["border_primary"])
+
+    def style_input(self, widget) -> None:
+        theme = self.theme_data
+        widget.styles.background = theme["surface"]
+        widget.styles.color = theme["text"]
+        widget.styles.border = ("solid", theme["border_secondary"])
+
+    def style_button(self, button: Button) -> None:
+        theme = self.theme_data
+        button.styles.background = theme["panel"]
+        button.styles.color = theme["text"]
+
+        if button.variant == "success":
+            button.styles.border = ("solid", theme["accent_ok"])
+        elif button.variant == "error":
+            button.styles.border = ("solid", theme["accent_bad"])
+        else:
+            button.styles.border = ("solid", theme["border_secondary"])
+
+    def style_modal(self, screen_obj) -> None:
+        theme = self.theme_data
+        screen_obj.styles.background = theme["background"]
+        screen_obj.styles.color = theme["text"]
+
+        for container in screen_obj.query(Container):
+            container.styles.background = theme["panel"]
+            container.styles.color = theme["text"]
+            container_id = getattr(container, "id", "") or ""
+
+            if "dialog" in container_id:
+                container.styles.border = ("round", theme["border_primary"])
+            elif "pane" in container_id:
+                container.styles.border = ("solid", theme["border_secondary"])
+
+        for static in screen_obj.query(Static):
+            static.styles.color = theme["text"]
+
+        for label in screen_obj.query(Label):
+            label.styles.color = theme["text"]
+
+        for tree in screen_obj.query(Tree):
+            self.style_tree(tree)
+
+        for inp in screen_obj.query(Input):
+            self.style_input(inp)
+
+        for area in screen_obj.query(TextArea):
+            self.style_input(area)
+
+        for button in screen_obj.query(Button):
+            self.style_button(button)
+
     def apply_theme(self) -> None:
+        self.theme_data = self.build_theme_data()
         theme = self.theme_data
 
         self.styles.background = theme["background"]
+        self.styles.color = theme["text"]
         self.screen.styles.background = theme["background"]
+        self.screen.styles.color = theme["text"]
 
-        for widget_id in [
-            "#banner",
-            "#main",
-            "#lower-panels",
-            "#projects-panel",
-            "#projects",
-            "#date-panel",
-            "#date-labels-scroll",
-            "#date-labels",
-            "#timeline-panel",
-            "#gantt-timeline-scroll",
-            "#gantt-timeline",
-        ]:
-            try:
-                widget = self.query_one(widget_id)
-                widget.styles.background = theme["background"]
-                widget.styles.color = theme["text"]
-            except Exception:
-                pass
+        self.query_one("#main").styles.background = theme["background"]
+        self.query_one("#main").styles.color = theme["text"]
 
-        self.query_one("#banner").styles.border = ("round", theme["border_primary"])
-        self.query_one("#projects-panel").styles.border = ("solid", theme["border_primary"])
-        self.query_one("#date-panel").styles.border = ("solid", theme["border_secondary"])
-        self.query_one("#timeline-panel").styles.border = ("solid", theme["border_primary"])
+        self.query_one("#lower-panels").styles.background = theme["background"]
+        self.query_one("#lower-panels").styles.color = theme["text"]
 
+        banner = self.query_one("#banner")
+        banner.styles.background = theme["panel"]
+        banner.styles.color = theme["text"]
+        banner.styles.border = ("round", theme["border_primary"])
+
+        projects_panel = self.query_one("#projects-panel")
+        projects_panel.styles.background = theme["panel"]
+        projects_panel.styles.color = theme["text"]
+        projects_panel.styles.border = ("solid", theme["border_primary"])
+
+        date_panel = self.query_one("#date-panel")
+        date_panel.styles.background = theme["panel"]
+        date_panel.styles.color = theme["text"]
+        date_panel.styles.border = ("solid", theme["border_secondary"])
+
+        timeline_panel = self.query_one("#timeline-panel")
+        timeline_panel.styles.background = theme["panel"]
+        timeline_panel.styles.color = theme["text"]
+        timeline_panel.styles.border = ("solid", theme["border_primary"])
+
+        self.query_one("#date-labels-scroll").styles.background = theme["surface"]
+        self.query_one("#date-labels-scroll").styles.color = theme["text"]
+        self.query_one("#gantt-timeline-scroll").styles.background = theme["surface"]
+        self.query_one("#gantt-timeline-scroll").styles.color = theme["text"]
+
+        self.query_one("#date-labels").styles.background = theme["surface"]
+        self.query_one("#date-labels").styles.color = theme["text"]
+        self.query_one("#gantt-timeline").styles.background = theme["surface"]
+        self.query_one("#gantt-timeline").styles.color = theme["text"]
+
+        self.style_tree(self.query_one("#projects", Tree))
         self.query_one("#banner", Banner).refresh_banner()
 
     def refresh_project_tree(self) -> None:
@@ -1726,9 +1566,12 @@ class PyGanttApp(App):
             tasks = self.projects[project_name]
 
             if project_name in self.selected_projects:
-                project_label = f"[bold {self.theme_data['accent_ok']}][+][/bold {self.theme_data['accent_ok']}] {project_name}"
+                project_label = (
+                    f"[bold {self.theme_data['accent_ok']}][+][/bold {self.theme_data['accent_ok']}] "
+                    f"[bold {self.theme_data['project_header']}]{project_name}[/]"
+                )
             else:
-                project_label = f"[dim][ ][/] {project_name}"
+                project_label = f"[dim][ ][/] [bold {self.theme_data['project_header']}]{project_name}[/]"
 
             project_node = root.add(
                 project_label,
@@ -1856,10 +1699,20 @@ class PyGanttApp(App):
             return " " * TIMELINE_CELL_WIDTH
 
         def weekend_cell() -> str:
-            return "░" * TIMELINE_CELL_WIDTH
+            return f"[bold {theme['weekend_dim']}]▓▓[/]"
 
         def separator_line() -> str:
-            return "─" * max(20, len(plain([f"{d.day:02d}" for d in days])))
+            return f"[{theme['border_secondary']}]" + ("─" * max(20, len(plain([f'{d.day:02d}' for d in days])))) + "[/]"
+
+        def weekend_aware_row(values: list[str], normal_color: str) -> str:
+            parts = []
+            for i, value in enumerate(values):
+                styled = fit(value)
+                if days[i].weekday() >= 5:
+                    parts.append(f"[bold {theme['weekend_dim']}]{styled}[/]")
+                else:
+                    parts.append(f"[{normal_color}]{styled}[/]")
+            return " ".join(parts)
 
         def make_task_row(task_start: date, task_end: date, is_selected_task: bool, row_number: int) -> str:
             cells = []
@@ -1904,26 +1757,30 @@ class PyGanttApp(App):
         date_values = [f"{d.day:02d}" for d in days]
         dow_values = [d.strftime("%a")[:2].upper() for d in days]
 
+        year_grouped = [year_values[i] if i == 0 or year_values[i] != year_values[i - 1] else "" for i in range(len(year_values))]
+        month_grouped = [month_values[i] if i == 0 or month_values[i] != month_values[i - 1] else "" for i in range(len(month_values))]
+        week_grouped = [week_values[i] if i == 0 or week_values[i] != week_values[i - 1] else "" for i in range(len(week_values))]
+
         left_lines += [
-            pad_label("YEAR"),
-            pad_label("MONTH"),
-            pad_label("WEEK"),
-            pad_label("DATE"),
-            pad_label("DAY"),
+            f"[bold {theme['border_primary']}]{pad_label('YEAR')}[/]",
+            f"[bold {theme['border_primary']}]{pad_label('MONTH')}[/]",
+            f"[bold {theme['border_primary']}]{pad_label('WEEK')}[/]",
+            f"[bold {theme['border_primary']}]{pad_label('DATE')}[/]",
+            f"[bold {theme['border_primary']}]{pad_label('DAY')}[/]",
         ]
         right_lines += [
-            grouped(year_values),
-            grouped(month_values),
-            grouped(week_values),
-            plain(date_values),
-            plain(dow_values),
+            weekend_aware_row(year_grouped, theme["border_primary"]),
+            weekend_aware_row(month_grouped, theme["border_primary"]),
+            weekend_aware_row(week_grouped, theme["border_primary"]),
+            weekend_aware_row(date_values, theme["text"]),
+            weekend_aware_row(dow_values, theme["text"]),
         ]
 
-        left_lines.append("─" * LEFT_PANEL_WIDTH)
+        left_lines.append(f"[{theme['border_secondary']}]" + ("─" * LEFT_PANEL_WIDTH) + "[/]")
         right_lines.append(separator_line())
 
         if not selected_projects:
-            left_lines.append(pad_label("NO TASKS SELECTED"))
+            left_lines.append(f"[{theme['accent_warn']}]{pad_label('NO TASKS SELECTED')}[/]")
             right_lines.append(" ".join(empty() for _ in days))
             return left_lines, right_lines
 
@@ -1956,9 +1813,9 @@ class PyGanttApp(App):
                 task_text = pad_label(f"  {status} {task['task']}")
 
                 if is_selected:
-                    left_lines.append(f"[bold reverse]{task_text}[/]")
+                    left_lines.append(f"[bold {theme['text']} on {theme['selection']}]{task_text}[/]")
                 else:
-                    left_lines.append(task_text)
+                    left_lines.append(f"[{theme['text']}]{task_text}[/]")
 
                 right_lines.append(
                     make_task_row(
@@ -2356,11 +2213,17 @@ class PyGanttApp(App):
         current_index = self.theme_names.index(self.theme_name)
         next_index = (current_index + 1) % len(self.theme_names)
         self.theme_name = self.theme_names[next_index]
-        self.theme_data = THEMES[self.theme_name]
         self.apply_theme()
         self.refresh_project_tree()
         self.refresh_gantt_view()
         self.notify(f"THEME = {self.theme_name.upper()}")
+
+    def action_toggle_background(self) -> None:
+        self.background_mode = "light" if self.background_mode == "dark" else "dark"
+        self.apply_theme()
+        self.refresh_project_tree()
+        self.refresh_gantt_view()
+        self.notify(f"BACKGROUND = {self.background_mode.upper()}")
 
     def action_cycle_logo(self) -> None:
         if not self.banners:
