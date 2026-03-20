@@ -125,9 +125,11 @@ THEMES = {
 }
 
 
-BANNERS = [
+CUSTOM_BANNERS_FILE = "custom_banners.txt"
+
+FALLBACK_BANNERS = [
     {
-        "name": "classic",
+        "name": "pygantt",
         "art": r"""
     ██████╗ ██╗   ██╗ ██████╗  █████╗ ███╗   ██╗████████╗████████╗
     ██╔══██╗╚██╗ ██╔╝██╔════╝ ██╔══██╗████╗  ██║╚══██╔══╝╚══██╔══╝
@@ -136,46 +138,43 @@ BANNERS = [
     ██║        ██║   ╚██████╔╝██║  ██║██║ ╚████║   ██║      ██║
     ╚═╝        ╚═╝    ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═══╝   ╚═╝      ╚═╝
         """,
-    },
-    {
-        "name": "boxed",
-        "art": r"""
-    ╔══════════════════════════════════════════════════════════════╗
-    ║  ██████╗ ██╗   ██╗ ██████╗  █████╗ ███╗   ██╗████████╗      ║
-    ║  ██╔══██╗╚██╗ ██╔╝██╔════╝ ██╔══██╗████╗  ██║╚══██╔══╝      ║
-    ║  ██████╔╝ ╚████╔╝ ██║  ███╗███████║██╔██╗ ██║   ██║         ║
-    ║  ██╔═══╝   ╚██╔╝  ██║   ██║██╔══██║██║╚██╗██║   ██║         ║
-    ║  ██║        ██║   ╚██████╔╝██║  ██║██║ ╚████║   ██║         ║
-    ║  ╚═╝        ╚═╝    ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═══╝   ╚═╝         ║
-    ╚══════════════════════════════════════════════════════════════╝
-        """,
-    },
-    {
-        "name": "compact",
-        "art": r"""
-    ██████  ██    ██  ██████   █████  ███    ██ ████████
-    ██   ██  ██  ██  ██       ██   ██ ████   ██    ██
-    ██████    ████   ██   ███ ███████ ██ ██  ██    ██
-    ██         ██    ██    ██ ██   ██ ██  ██ ██    ██
-    ██         ██     ██████  ██   ██ ██   ████    ██
-        """,
-    },
-    {
-        "name": "terminal",
-        "art": r"""
-     ____  __   __  ____    _    _   _ _____ _____
-    |  _ \ \ \ / / / ___|  / \  | \ | |_   _|_   _|
-    | |_) | \ V / | |  _  / _ \ |  \| | | |   | |
-    |  __/   | |  | |_| |/ ___ \| |\  | | |   | |
-    |_|      |_|   \____/_/   \_\_| \_| |_|   |_|
-        """,
-    },
+    }
 ]
 
 
 LEFT_PANEL_WIDTH = 30
 MONTHS_VISIBLE = 4
 TIMELINE_CELL_WIDTH = 2
+
+
+def load_custom_banners(file_path: str = CUSTOM_BANNERS_FILE) -> list[dict]:
+    if not os.path.exists(file_path):
+        return []
+
+    banners: list[dict] = []
+    current_name: str | None = None
+    current_lines: list[str] = []
+
+    with open(file_path, "r", encoding="utf-8") as handle:
+        for raw_line in handle:
+            line = raw_line.rstrip("\n")
+
+            if line.startswith("===") and line.endswith("==="):
+                if current_name and current_lines:
+                    art = "\n".join(current_lines).rstrip()
+                    if art.strip():
+                        banners.append({"name": current_name, "art": art})
+                current_name = line.strip("= ").strip().lower()
+                current_lines = []
+            else:
+                current_lines.append(line)
+
+    if current_name and current_lines:
+        art = "\n".join(current_lines).rstrip()
+        if art.strip():
+            banners.append({"name": current_name, "art": art})
+
+    return banners
 
 
 def shorten_middle(value: str, max_length: int = 64) -> str:
@@ -267,10 +266,8 @@ class Banner(Static):
     def refresh_banner(self) -> None:
         theme = self.app.theme_data
         banner_data = self.app.get_current_banner()
-        subtitle = (
-            f"    A Python-based terminal Gantt-chart tool, by Remie Stronks"
-            f"  ::  logo={banner_data['name']}  theme={self.app.theme_name}"
-        )
+        subtitle = "    A Python-based terminal Gantt-chart tool, by Remie Stronks"
+
         self.update(
             f"[bold {theme['banner']}]{banner_data['art']}[/]\n"
             f"[italic {theme['text']}]{subtitle}[/]"
@@ -1311,7 +1308,14 @@ class PyGanttApp(App):
         self.theme_name = "retro_neon"
         self.theme_data = THEMES[self.theme_name]
 
+        loaded_banners = load_custom_banners(CUSTOM_BANNERS_FILE)
+        self.banners = loaded_banners if loaded_banners else FALLBACK_BANNERS
+
         self.banner_index = 0
+        for i, banner in enumerate(self.banners):
+            if banner.get("name", "").lower() == "pygantt":
+                self.banner_index = i
+                break
 
         for project_tasks in self.projects.values():
             for task in project_tasks:
@@ -1320,7 +1324,7 @@ class PyGanttApp(App):
                 task.setdefault("todos", [])
 
     def get_current_banner(self) -> dict:
-        return BANNERS[self.banner_index]
+        return self.banners[self.banner_index]
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -2030,9 +2034,11 @@ class PyGanttApp(App):
         self.notify(f"THEME = {self.theme_name.upper()}")
 
     def action_cycle_logo(self) -> None:
-        self.banner_index = (self.banner_index + 1) % len(BANNERS)
+        if not self.banners:
+            return
+        self.banner_index = (self.banner_index + 1) % len(self.banners)
         self.query_one("#banner", Banner).refresh_banner()
-        self.notify(f"LOGO = {self.get_current_banner()['name'].upper()}")
+        self.notify("LOGO CHANGED")
 
     def toggle_project_in_gantt(self, project_name: str | None) -> None:
         if not project_name or project_name not in self.projects:
