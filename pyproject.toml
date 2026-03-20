@@ -1,26 +1,29 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=65", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "pygantt-retro"
+name = "pygantt"
 version = "0.1.0"
-description = "A retro terminal Gantt chart tool built with Python and Textual"
-readme = "README.md"
-requires-python = ">=3.11"
-license = { text = "MIT" }
-authors = [{ name = "Remie Stronks" }]
-dependencies = [
-    "textual[syntax]>=0.58.0",
-    "odfpy>=1.4.1",
+description = "Terminal-based Gantt chart tool with ASCII banners"
+authors = [
+    { name = "Remie Stronks" }
 ]
-
-[project.urls]
-Homepage = "https://github.com/RemieS/PYGANTT_GUI"
-Issues = "https://github.com/RemieS/PYGANTT_GUI/issues"
-
-[tool.setuptools]
-py-modules = ["pygantt", "data"]
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "textual",
+]
 
 [project.scripts]
 pygantt = "pygantt:main"
+
+[tool.setuptools]
+py-modules = ["pygantt"]
+
+
+[tool.setuptools.package-data]
+"" = ["custom_banners.txt"]
+
+[tool.setuptools.exclude-package-data]
+"" = ["__pycache__/*", "*.pyc"]
