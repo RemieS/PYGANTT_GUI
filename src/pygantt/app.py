@@ -11,7 +11,7 @@ from textual.containers import Horizontal, Vertical, Container, ScrollableContai
 from textual.screen import ModalScreen
 from textual.widgets import Header, Footer, Tree, Static, Input, Button, Label, TextArea
 
-from data import (
+from .data import (
     load_projects,
     save_projects,
     add_project,
