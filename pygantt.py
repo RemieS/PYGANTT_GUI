@@ -1,5 +1,4 @@
 import os
-import re
 import sys
 import subprocess
 from datetime import datetime, timedelta, date
@@ -29,16 +28,19 @@ from data import (
 THEMES = {
     "retro_neon": {
         "banner": "#ff3df5",
-        "border_primary": "cyan",
-        "border_secondary": "magenta",
-        "task_bar_1": "#ff00d4",
-        "task_bar_2": "#00f0ff",
+        "border_primary": "#00f0ff",
+        "border_secondary": "#ff00d4",
+        "task_bar_1": "#0b6ea8",
+        "task_bar_2": "#1294d8",
         "current_day": "#39ff14",
         "text": "white",
         "background": "#000000",
         "accent_ok": "#39ff14",
         "accent_warn": "#ffea00",
         "accent_bad": "#ff5555",
+        "project_header": "#00f0ff",
+        "selection": "#ff00d4",
+        "weekend_dim": "#1a1a1a",
     },
     "ice_neon": {
         "banner": "#6fffe9",
@@ -52,6 +54,9 @@ THEMES = {
         "accent_ok": "#39ff14",
         "accent_warn": "#ffea00",
         "accent_bad": "#ff5555",
+        "project_header": "#6fffe9",
+        "selection": "#9b5de5",
+        "weekend_dim": "#1a1a1a",
     },
     "acid_green": {
         "banner": "#39ff14",
@@ -65,6 +70,9 @@ THEMES = {
         "accent_ok": "#39ff14",
         "accent_warn": "#ffea00",
         "accent_bad": "#ff5555",
+        "project_header": "#39ff14",
+        "selection": "#ffea00",
+        "weekend_dim": "#1a1a1a",
     },
     "bw_night": {
         "banner": "white",
@@ -78,6 +86,9 @@ THEMES = {
         "accent_ok": "white",
         "accent_warn": "#bbbbbb",
         "accent_bad": "#777777",
+        "project_header": "white",
+        "selection": "#bbbbbb",
+        "weekend_dim": "#1a1a1a",
     },
     "bw_day": {
         "banner": "black",
@@ -91,6 +102,9 @@ THEMES = {
         "accent_ok": "#006600",
         "accent_warn": "#666600",
         "accent_bad": "#aa0000",
+        "project_header": "black",
+        "selection": "#666666",
+        "weekend_dim": "#dddddd",
     },
     "amber_term": {
         "banner": "#ffbf00",
@@ -104,8 +118,16 @@ THEMES = {
         "accent_ok": "#ffdf80",
         "accent_warn": "#ffbf00",
         "accent_bad": "#ff7b00",
+        "project_header": "#ffbf00",
+        "selection": "#ff9f1c",
+        "weekend_dim": "#2a1d00",
     },
 }
+
+
+LEFT_PANEL_WIDTH = 30
+MONTHS_VISIBLE = 4
+TIMELINE_CELL_WIDTH = 2
 
 
 def shorten_middle(value: str, max_length: int = 64) -> str:
@@ -181,6 +203,40 @@ def retro_file_tag(file_path: str) -> str:
     if ext == ".pdf":
         return "[D]"
     return "[F]"
+
+
+def parse_hex_color(value: str, fallback: tuple[int, int, int] = (255, 255, 255)) -> tuple[int, int, int]:
+    value = str(value).strip()
+    named = {
+        "white": (255, 255, 255),
+        "black": (0, 0, 0),
+        "red": (255, 0, 0),
+        "green": (0, 128, 0),
+        "blue": (0, 0, 255),
+        "cyan": (0, 255, 255),
+        "magenta": (255, 0, 255),
+        "yellow": (255, 255, 0),
+    }
+    if value.lower() in named:
+        return named[value.lower()]
+
+    if value.startswith("#") and len(value) == 7:
+        try:
+            return (
+                int(value[1:3], 16),
+                int(value[3:5], 16),
+                int(value[5:7], 16),
+            )
+        except ValueError:
+            return fallback
+    return fallback
+
+
+def pad_label(text: str, width: int = LEFT_PANEL_WIDTH) -> str:
+    plain = text
+    if len(plain) > width:
+        plain = plain[: width - 3] + "..."
+    return plain.ljust(width)
 
 
 class Banner(Static):
@@ -1170,7 +1226,7 @@ class PyGanttApp(App):
         border: solid magenta;
         margin-right: 1;
     }
-    
+
     #date-labels-scroll {
         width: 1fr;
         height: 1fr;
@@ -1178,12 +1234,12 @@ class PyGanttApp(App):
         overflow-y: auto;
         border: none;
     }
-    
+
     #date-labels {
         width: 30;
         padding: 1;
     }
-    
+
     #timeline-panel {
         width: 1fr;
         min-width: 80;
@@ -1234,7 +1290,7 @@ class PyGanttApp(App):
         self.last_browsed_path = os.path.expanduser("~")
 
         self.theme_names = list(THEMES.keys())
-        self.theme_name = "ice_neon"
+        self.theme_name = "retro_neon"
         self.theme_data = THEMES[self.theme_name]
 
         for project_tasks in self.projects.values():
@@ -1313,6 +1369,7 @@ class PyGanttApp(App):
         for project_name in sorted(self.projects.keys()):
             tasks = self.projects[project_name]
             prefix = "[+]" if project_name in self.selected_projects else "[ ]"
+
             project_node = root.add(
                 f"{prefix} {project_name}",
                 data={"type": "project", "project": project_name},
@@ -1365,11 +1422,10 @@ class PyGanttApp(App):
 
         start = first_day.replace(day=1)
 
-        months_visible = 4
         end_year = start.year
         end_month = start.month
 
-        for _ in range(months_visible - 1):
+        for _ in range(MONTHS_VISIBLE - 1):
             if end_month == 12:
                 end_month = 1
                 end_year += 1
@@ -1413,15 +1469,13 @@ class PyGanttApp(App):
         today = datetime.now().date()
         total_days = (end_date - start_date).days + 1
         days = [start_date + timedelta(days=i) for i in range(total_days)]
-
         theme = self.theme_data
+
         left_lines: list[str] = []
         right_lines: list[str] = []
 
-        cell_width = 2
-
         def fit(value: str) -> str:
-            return f"{value[:cell_width]:^{cell_width}}"
+            return f"{value[:TIMELINE_CELL_WIDTH]:^{TIMELINE_CELL_WIDTH}}"
 
         def grouped(values: list[str]) -> str:
             prev = None
@@ -1436,27 +1490,30 @@ class PyGanttApp(App):
             return " ".join(fit(value) for value in values)
 
         def bar(style: str, char: str = "█") -> str:
-            return f"[{style}]{char * cell_width}[/]"
+            return f"[{style}]{char * TIMELINE_CELL_WIDTH}[/]"
 
         def empty() -> str:
-            return " " * cell_width
+            return " " * TIMELINE_CELL_WIDTH
 
         def weekend_cell() -> str:
-            return "░" * cell_width
+            return "░" * TIMELINE_CELL_WIDTH
 
-        def make_task_row(row: dict, is_selected: bool, row_number: int) -> str:
+        def separator_line() -> str:
+            return "─" * max(20, len(plain([f'{d.day:02d}' for d in days])))
+
+        def make_task_row(task_start: date, task_end: date, is_selected_task: bool, row_number: int) -> str:
             cells = []
             row_color = theme["task_bar_1"] if row_number % 2 == 0 else theme["task_bar_2"]
 
             for day_value in days:
                 weekend = day_value.weekday() >= 5
-                in_task = row["start"] <= day_value <= row["end"]
+                in_task = task_start <= day_value <= task_end
                 is_today = day_value == today
 
-                if in_task and is_selected and is_today:
+                if in_task and is_selected_task and is_today:
                     cells.append(bar(f"bold {theme['current_day']}"))
-                elif in_task and is_selected:
-                    cells.append(bar(f"bold {theme['border_secondary']}"))
+                elif in_task and is_selected_task:
+                    cells.append(bar(f"bold {theme['selection']}"))
                 elif in_task and is_today:
                     cells.append(bar(f"bold {theme['current_day']}"))
                 elif in_task:
@@ -1470,13 +1527,30 @@ class PyGanttApp(App):
 
             return " ".join(cells)
 
+        def make_project_header_row(project_name: str) -> str:
+            cells = []
+            for day_value in days:
+                if day_value == today:
+                    cells.append(bar(f"bold {theme['current_day']}", "·"))
+                elif day_value.weekday() >= 5:
+                    cells.append(weekend_cell())
+                else:
+                    cells.append(empty())
+            return " ".join(cells)
+
         year_values = [f"{d.year % 100:02d}" for d in days]
         month_values = [d.strftime("%m") for d in days]
         week_values = [f"{d.isocalendar().week:02d}" for d in days]
         date_values = [f"{d.day:02d}" for d in days]
         dow_values = [d.strftime("%a")[:2].upper() for d in days]
 
-        left_lines += ["YEAR", "MONTH", "WEEK", "DATE", "DAY"]
+        left_lines += [
+            pad_label("YEAR"),
+            pad_label("MONTH"),
+            pad_label("WEEK"),
+            pad_label("DATE"),
+            pad_label("DAY"),
+        ]
         right_lines += [
             grouped(year_values),
             grouped(month_values),
@@ -1485,38 +1559,60 @@ class PyGanttApp(App):
             plain(dow_values),
         ]
 
-        separator = "─" * (len(right_lines[0]) if right_lines else 20)
-        left_lines.append("─" * 22)
-        right_lines.append(separator)
+        left_lines.append("─" * LEFT_PANEL_WIDTH)
+        right_lines.append(separator_line())
 
         if not selected_projects:
-            left_lines.append("NO TASKS SELECTED")
+            left_lines.append(pad_label("NO TASKS SELECTED"))
             right_lines.append(" ".join(empty() for _ in days))
             return left_lines, right_lines
 
+        global_row_counter = 0
+
         for project_name in selected_projects:
             project_tasks = projects.get(project_name, [])
+
+            header_label = f"[bold {theme['project_header']}]■ {project_name}[/]"
+            left_lines.append(header_label)
+            right_lines.append(make_project_header_row(project_name))
+
             if not project_tasks:
+                left_lines.append(pad_label("  (NO TASKS)"))
+                right_lines.append(" ".join(empty() for _ in days))
+                left_lines.append("")
+                right_lines.append("")
                 continue
 
             for task_index, task in enumerate(project_tasks):
-                row = {
-                    "start": task["start"].date(),
-                    "end": task["end"].date(),
-                }
+                task_start = task["start"].date()
+                task_end = task["end"].date()
+                status = task_status_label(task)
 
-                label = f"{project_name[:10]} / {task_status_label(task)} {task['task'][:10]}"
                 is_selected = (
                     self.selected_project == project_name
                     and self.selected_task_index == task_index
                 )
 
-                if is_selected:
-                    left_lines.append(f"[bold reverse]{label}[/]")
-                else:
-                    left_lines.append(label)
+                task_text = f"  {status} {task['task']}"
+                task_text = pad_label(task_text)
 
-                right_lines.append(make_task_row(row, is_selected, task_index))
+                if is_selected:
+                    left_lines.append(f"[bold reverse]{task_text}[/]")
+                else:
+                    left_lines.append(task_text)
+
+                right_lines.append(
+                    make_task_row(
+                        task_start=task_start,
+                        task_end=task_end,
+                        is_selected_task=is_selected,
+                        row_number=global_row_counter,
+                    )
+                )
+                global_row_counter += 1
+
+            left_lines.append("")
+            right_lines.append("")
 
         return left_lines, right_lines
 
@@ -1914,7 +2010,7 @@ class PyGanttApp(App):
             return
 
         project_name = node.data.get("project")
-        if project_name not in self.projects:
+        if not project_name or project_name not in self.projects:
             return
 
         if project_name in self.selected_projects:
@@ -1963,12 +2059,15 @@ class PyGanttApp(App):
 
         try:
             output_path = ensure_ods_path(file_path)
+
+            # Current active theme is passed through here.
             saved_path = export_projects_to_ods(
                 self.projects,
                 export_names,
                 output_path,
                 self.theme_data,
             )
+
             self.notify(f"EXPORTED: {saved_path}")
             auto_open_file(saved_path)
         except Exception as exc:
