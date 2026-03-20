@@ -184,7 +184,7 @@ FALLBACK_BANNERS = [
     }
 ]
 
-LEFT_PANEL_WIDTH = 30
+LEFT_PANEL_WIDTH = 34
 MONTHS_VISIBLE = 4
 TIMELINE_CELL_WIDTH = 2
 
@@ -305,7 +305,8 @@ def retro_file_tag(file_path: str) -> str:
 
 
 def pad_label(text: str, width: int = LEFT_PANEL_WIDTH) -> str:
-    plain = text
+    plain = str(text).replace("\n", " ").replace("\r", " ").replace("\t", " ")
+    plain = " ".join(plain.split())
     if len(plain) > width:
         plain = plain[: width - 3] + "..."
     return plain.ljust(width)
@@ -1313,8 +1314,8 @@ class PyGanttApp(App):
     }
 
     #date-panel {
-        width: 32;
-        min-width: 32;
+        width: 36;
+        min-width: 36;
         height: 1fr;
         margin-right: 1;
     }
@@ -1328,7 +1329,8 @@ class PyGanttApp(App):
     }
 
     #date-labels {
-        width: 30;
+        width: 34;
+        height: auto;
         padding: 1;
     }
 
@@ -1565,13 +1567,7 @@ class PyGanttApp(App):
         for project_name in sorted(self.projects.keys()):
             tasks = self.projects[project_name]
 
-            if project_name in self.selected_projects:
-                project_label = (
-                    f"[bold {self.theme_data['accent_ok']}][+][/bold {self.theme_data['accent_ok']}] "
-                    f"[bold {self.theme_data['project_header']}]{project_name}[/]"
-                )
-            else:
-                project_label = f"[dim][ ][/] [bold {self.theme_data['project_header']}]{project_name}[/]"
+            project_label = f"[bold {self.theme_data['project_header']}]{project_name}[/]"
 
             project_node = root.add(
                 project_label,
@@ -1698,21 +1694,11 @@ class PyGanttApp(App):
         def empty() -> str:
             return " " * TIMELINE_CELL_WIDTH
 
+        def blank_row() -> str:
+            return " ".join(empty() for _ in days)
+
         def weekend_cell() -> str:
             return f"[bold {theme['weekend_dim']}]▓▓[/]"
-
-        def separator_line() -> str:
-            return f"[{theme['border_secondary']}]" + ("─" * max(20, len(plain([f'{d.day:02d}' for d in days])))) + "[/]"
-
-        def weekend_aware_row(values: list[str], normal_color: str) -> str:
-            parts = []
-            for i, value in enumerate(values):
-                styled = fit(value)
-                if days[i].weekday() >= 5:
-                    parts.append(f"[bold {theme['weekend_dim']}]{styled}[/]")
-                else:
-                    parts.append(f"[{normal_color}]{styled}[/]")
-            return " ".join(parts)
 
         def make_task_row(task_start: date, task_end: date, is_selected_task: bool, row_number: int) -> str:
             cells = []
@@ -1740,26 +1726,11 @@ class PyGanttApp(App):
 
             return " ".join(cells)
 
-        def make_project_header_row() -> str:
-            cells = []
-            for day_value in days:
-                if day_value == today:
-                    cells.append(bar(f"bold {theme['current_day']}", "·"))
-                elif day_value.weekday() >= 5:
-                    cells.append(weekend_cell())
-                else:
-                    cells.append(empty())
-            return " ".join(cells)
-
         year_values = [f"{d.year % 100:02d}" for d in days]
         month_values = [d.strftime("%m") for d in days]
         week_values = [f"{d.isocalendar().week:02d}" for d in days]
         date_values = [f"{d.day:02d}" for d in days]
         dow_values = [d.strftime("%a")[:2].upper() for d in days]
-
-        year_grouped = [year_values[i] if i == 0 or year_values[i] != year_values[i - 1] else "" for i in range(len(year_values))]
-        month_grouped = [month_values[i] if i == 0 or month_values[i] != month_values[i - 1] else "" for i in range(len(month_values))]
-        week_grouped = [week_values[i] if i == 0 or week_values[i] != week_values[i - 1] else "" for i in range(len(week_values))]
 
         left_lines += [
             f"[bold {theme['border_primary']}]{pad_label('YEAR')}[/]",
@@ -1769,19 +1740,16 @@ class PyGanttApp(App):
             f"[bold {theme['border_primary']}]{pad_label('DAY')}[/]",
         ]
         right_lines += [
-            weekend_aware_row(year_grouped, theme["border_primary"]),
-            weekend_aware_row(month_grouped, theme["border_primary"]),
-            weekend_aware_row(week_grouped, theme["border_primary"]),
-            weekend_aware_row(date_values, theme["text"]),
-            weekend_aware_row(dow_values, theme["text"]),
+            f"[{theme['border_primary']}]{grouped(year_values)}[/]",
+            f"[{theme['border_primary']}]{grouped(month_values)}[/]",
+            f"[{theme['border_primary']}]{grouped(week_values)}[/]",
+            f"[{theme['text']}]{plain(date_values)}[/]",
+            f"[{theme['text']}]{plain(dow_values)}[/]",
         ]
-
-        left_lines.append(f"[{theme['border_secondary']}]" + ("─" * LEFT_PANEL_WIDTH) + "[/]")
-        right_lines.append(separator_line())
 
         if not selected_projects:
             left_lines.append(f"[{theme['accent_warn']}]{pad_label('NO TASKS SELECTED')}[/]")
-            right_lines.append(" ".join(empty() for _ in days))
+            right_lines.append(blank_row())
             return left_lines, right_lines
 
         global_row_counter = 0
@@ -1789,15 +1757,9 @@ class PyGanttApp(App):
         for project_name in selected_projects:
             project_tasks = projects.get(project_name, [])
 
-            header_label = f"[bold {theme['project_header']}]■ {project_name}[/]"
-            left_lines.append(header_label)
-            right_lines.append(make_project_header_row())
-
             if not project_tasks:
-                left_lines.append(pad_label("  (NO TASKS)"))
-                right_lines.append(" ".join(empty() for _ in days))
-                left_lines.append("")
-                right_lines.append("")
+                left_lines.append(f"[bold {theme['project_header']}]{pad_label('(NO TASKS)')}[/]")
+                right_lines.append(blank_row())
                 continue
 
             for task_index, task in enumerate(project_tasks):
@@ -1810,12 +1772,13 @@ class PyGanttApp(App):
                     and self.selected_task_index == task_index
                 )
 
-                task_text = pad_label(f"  {status} {task['task']}")
+                # ONLY task text here, no project name, no extra symbols
+                row_text = pad_label(f"{status} {task['task']}")
 
                 if is_selected:
-                    left_lines.append(f"[bold {theme['text']} on {theme['selection']}]{task_text}[/]")
+                    left_lines.append(f"[bold {theme['text']} on {theme['selection']}]{row_text}[/]")
                 else:
-                    left_lines.append(f"[{theme['text']}]{task_text}[/]")
+                    left_lines.append(f"[{theme['text']}]{row_text}[/]")
 
                 right_lines.append(
                     make_task_row(
@@ -1826,9 +1789,6 @@ class PyGanttApp(App):
                     )
                 )
                 global_row_counter += 1
-
-            left_lines.append("")
-            right_lines.append("")
 
         return left_lines, right_lines
 
