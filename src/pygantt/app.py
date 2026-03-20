@@ -11,7 +11,7 @@ from textual.containers import Horizontal, Vertical, Container, ScrollableContai
 from textual.screen import ModalScreen
 from textual.widgets import Header, Footer, Tree, Static, Input, Button, Label, TextArea
 
-from .data import (
+from data import (
     load_projects,
     save_projects,
     add_project,
@@ -547,31 +547,31 @@ def build_flag_assets() -> list[dict]:
             "kind": "flag",
             "name": "progress_pride",
             "art": build_progress_pride_flag(),
-            "subtitle": "Progress Pride Flag",
+            "subtitle": "\nProgress Pride Flag",
         },
         {
             "kind": "flag",
             "name": "green_x",
             "art": build_green_x_flag(),
-            "subtitle": "Green X Flag",
+            "subtitle": "\nAchterhoek Flag",
         },
         {
             "kind": "flag",
             "name": "frisian",
             "art": build_frisian_flag(),
-            "subtitle": "Frisian Flag",
+            "subtitle": "\nFrisian Flag",
         },
         {
             "kind": "flag",
             "name": "palestine",
             "art": build_palestine_flag(),
-            "subtitle": "Palestine Flag",
+            "subtitle": "\nPalestine Flag",
         },
         {
             "kind": "flag",
             "name": "papua_new_guinea",
             "art": build_png_flag(),
-            "subtitle": "Papua New Guinea Flag",
+            "subtitle": "\nPapua New Guinea Flag",
         },
     ]
 
@@ -584,18 +584,21 @@ class Banner(Static):
         theme = self.app.theme_data
         banner_data = self.app.get_current_banner()
 
-        default_subtitle = "    A Python-based terminal Gantt-chart tool, by Remie Stronks"
+        default_subtitle = "    lA Python-based terminal Gantt-chart tool, by Remie Stronks"
         subtitle = banner_data.get("subtitle", default_subtitle)
 
         art = banner_data.get("art", "").strip("\n")
 
+        if banner_data.get("kind") == "ascii":
+            art_block = f"[{theme['banner']}]{art}[/]"
+        else:
+            art_block = art
+
         self.update(
-            f"\n"
-            f"{art}\n"
-            f"\n"
+            "\n"
+            f"{art_block}\n"
             f"[italic {theme['text']}]{subtitle}[/]\n"
         )
-
 
 class ConfirmScreen(ModalScreen[bool]):
     CSS = """
