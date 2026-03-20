@@ -125,6 +125,54 @@ THEMES = {
 }
 
 
+BANNERS = [
+    {
+        "name": "classic",
+        "art": r"""
+    ██████╗ ██╗   ██╗ ██████╗  █████╗ ███╗   ██╗████████╗████████╗
+    ██╔══██╗╚██╗ ██╔╝██╔════╝ ██╔══██╗████╗  ██║╚══██╔══╝╚══██╔══╝
+    ██████╔╝ ╚████╔╝ ██║  ███╗███████║██╔██╗ ██║   ██║      ██║
+    ██╔═══╝   ╚██╔╝  ██║   ██║██╔══██║██║╚██╗██║   ██║      ██║
+    ██║        ██║   ╚██████╔╝██║  ██║██║ ╚████║   ██║      ██║
+    ╚═╝        ╚═╝    ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═══╝   ╚═╝      ╚═╝
+        """,
+    },
+    {
+        "name": "boxed",
+        "art": r"""
+    ╔══════════════════════════════════════════════════════════════╗
+    ║  ██████╗ ██╗   ██╗ ██████╗  █████╗ ███╗   ██╗████████╗      ║
+    ║  ██╔══██╗╚██╗ ██╔╝██╔════╝ ██╔══██╗████╗  ██║╚══██╔══╝      ║
+    ║  ██████╔╝ ╚████╔╝ ██║  ███╗███████║██╔██╗ ██║   ██║         ║
+    ║  ██╔═══╝   ╚██╔╝  ██║   ██║██╔══██║██║╚██╗██║   ██║         ║
+    ║  ██║        ██║   ╚██████╔╝██║  ██║██║ ╚████║   ██║         ║
+    ║  ╚═╝        ╚═╝    ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═══╝   ╚═╝         ║
+    ╚══════════════════════════════════════════════════════════════╝
+        """,
+    },
+    {
+        "name": "compact",
+        "art": r"""
+    ██████  ██    ██  ██████   █████  ███    ██ ████████
+    ██   ██  ██  ██  ██       ██   ██ ████   ██    ██
+    ██████    ████   ██   ███ ███████ ██ ██  ██    ██
+    ██         ██    ██    ██ ██   ██ ██  ██ ██    ██
+    ██         ██     ██████  ██   ██ ██   ████    ██
+        """,
+    },
+    {
+        "name": "terminal",
+        "art": r"""
+     ____  __   __  ____    _    _   _ _____ _____
+    |  _ \ \ \ / / / ___|  / \  | \ | |_   _|_   _|
+    | |_) | \ V / | |  _  / _ \ |  \| | | |   | |
+    |  __/   | |  | |_| |/ ___ \| |\  | | |   | |
+    |_|      |_|   \____/_/   \_\_| \_| |_|   |_|
+        """,
+    },
+]
+
+
 LEFT_PANEL_WIDTH = 30
 MONTHS_VISIBLE = 4
 TIMELINE_CELL_WIDTH = 2
@@ -205,33 +253,6 @@ def retro_file_tag(file_path: str) -> str:
     return "[F]"
 
 
-def parse_hex_color(value: str, fallback: tuple[int, int, int] = (255, 255, 255)) -> tuple[int, int, int]:
-    value = str(value).strip()
-    named = {
-        "white": (255, 255, 255),
-        "black": (0, 0, 0),
-        "red": (255, 0, 0),
-        "green": (0, 128, 0),
-        "blue": (0, 0, 255),
-        "cyan": (0, 255, 255),
-        "magenta": (255, 0, 255),
-        "yellow": (255, 255, 0),
-    }
-    if value.lower() in named:
-        return named[value.lower()]
-
-    if value.startswith("#") and len(value) == 7:
-        try:
-            return (
-                int(value[1:3], 16),
-                int(value[3:5], 16),
-                int(value[5:7], 16),
-            )
-        except ValueError:
-            return fallback
-    return fallback
-
-
 def pad_label(text: str, width: int = LEFT_PANEL_WIDTH) -> str:
     plain = text
     if len(plain) > width:
@@ -244,18 +265,14 @@ class Banner(Static):
         self.refresh_banner()
 
     def refresh_banner(self) -> None:
-        banner = r"""
-    ██████╗ ██╗   ██╗ ██████╗  █████╗ ███╗   ██╗████████╗████████╗
-    ██╔══██╗╚██╗ ██╔╝██╔════╝ ██╔══██╗████╗  ██║╚══██╔══╝╚══██╔══╝
-    ██████╔╝ ╚████╔╝ ██║  ███╗███████║██╔██╗ ██║   ██║      ██║
-    ██╔═══╝   ╚██╔╝  ██║   ██║██╔══██║██║╚██╗██║   ██║      ██║
-    ██║        ██║   ╚██████╔╝██║  ██║██║ ╚████║   ██║      ██║
-    ╚═╝        ╚═╝    ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═══╝   ╚═╝      ╚═╝
-    """
-        subtitle = "    A Python-based terminal Gantt-chart tool, by Remie Stronks"
         theme = self.app.theme_data
+        banner_data = self.app.get_current_banner()
+        subtitle = (
+            f"    A Python-based terminal Gantt-chart tool, by Remie Stronks"
+            f"  ::  logo={banner_data['name']}  theme={self.app.theme_name}"
+        )
         self.update(
-            f"[bold {theme['banner']}]{banner}[/]\n"
+            f"[bold {theme['banner']}]{banner_data['art']}[/]\n"
             f"[italic {theme['text']}]{subtitle}[/]"
         )
 
@@ -1269,11 +1286,12 @@ class PyGanttApp(App):
         ("e", "edit_selected", "EDIT"),
         ("d", "delete_selected", "DELETE"),
         ("enter", "open_workspace", "TASK WORKSPACE"),
-        ("space", "toggle_project_selection", "TOGGLE PROJECT"),
+        ("m", "toggle_project_selection", "TOGGLE PROJECT"),
         ("[", "previous_gantt_month", "PREV VIEW"),
         ("]", "next_gantt_month", "NEXT VIEW"),
         ("0", "reset_gantt_month", "RESET VIEW"),
         ("p", "cycle_theme", "THEME"),
+        ("l", "cycle_logo", "LOGO"),
         ("f", "attach_file", "ATTACH FILE"),
         ("o", "open_attachment", "OPEN FILE"),
         ("r", "remove_attachment", "REMOVE FILE"),
@@ -1293,11 +1311,16 @@ class PyGanttApp(App):
         self.theme_name = "retro_neon"
         self.theme_data = THEMES[self.theme_name]
 
+        self.banner_index = 0
+
         for project_tasks in self.projects.values():
             for task in project_tasks:
                 task.setdefault("attachments", [])
                 task.setdefault("notes", "")
                 task.setdefault("todos", [])
+
+    def get_current_banner(self) -> dict:
+        return BANNERS[self.banner_index]
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -1368,10 +1391,14 @@ class PyGanttApp(App):
 
         for project_name in sorted(self.projects.keys()):
             tasks = self.projects[project_name]
-            prefix = "[+]" if project_name in self.selected_projects else "[ ]"
+
+            if project_name in self.selected_projects:
+                project_label = f"[bold {self.theme_data['accent_ok']}][+][/bold {self.theme_data['accent_ok']}] {project_name}"
+            else:
+                project_label = f"[dim][ ][/] {project_name}"
 
             project_node = root.add(
-                f"{prefix} {project_name}",
+                project_label,
                 data={"type": "project", "project": project_name},
             )
 
@@ -1499,7 +1526,7 @@ class PyGanttApp(App):
             return "░" * TIMELINE_CELL_WIDTH
 
         def separator_line() -> str:
-            return "─" * max(20, len(plain([f'{d.day:02d}' for d in days])))
+            return "─" * max(20, len(plain([f"{d.day:02d}" for d in days])))
 
         def make_task_row(task_start: date, task_end: date, is_selected_task: bool, row_number: int) -> str:
             cells = []
@@ -1527,7 +1554,7 @@ class PyGanttApp(App):
 
             return " ".join(cells)
 
-        def make_project_header_row(project_name: str) -> str:
+        def make_project_header_row() -> str:
             cells = []
             for day_value in days:
                 if day_value == today:
@@ -1574,7 +1601,7 @@ class PyGanttApp(App):
 
             header_label = f"[bold {theme['project_header']}]■ {project_name}[/]"
             left_lines.append(header_label)
-            right_lines.append(make_project_header_row(project_name))
+            right_lines.append(make_project_header_row())
 
             if not project_tasks:
                 left_lines.append(pad_label("  (NO TASKS)"))
@@ -1593,8 +1620,7 @@ class PyGanttApp(App):
                     and self.selected_task_index == task_index
                 )
 
-                task_text = f"  {status} {task['task']}"
-                task_text = pad_label(task_text)
+                task_text = pad_label(f"  {status} {task['task']}")
 
                 if is_selected:
                     left_lines.append(f"[bold reverse]{task_text}[/]")
@@ -1689,7 +1715,7 @@ class PyGanttApp(App):
 
         prefilled = {
             "task": task["task"],
-            "assignee": task["assignee"],
+            "assignee": task.get("assignee", ""),
             "start": task["start"].strftime("%Y-%m-%d"),
             "end": task["end"].strftime("%Y-%m-%d"),
         }
@@ -2003,25 +2029,36 @@ class PyGanttApp(App):
         self.refresh_gantt_view()
         self.notify(f"THEME = {self.theme_name.upper()}")
 
-    def action_toggle_project_selection(self) -> None:
-        tree = self.query_one("#projects", Tree)
-        node = tree.cursor_node
-        if node is None or not isinstance(node.data, dict):
-            return
+    def action_cycle_logo(self) -> None:
+        self.banner_index = (self.banner_index + 1) % len(BANNERS)
+        self.query_one("#banner", Banner).refresh_banner()
+        self.notify(f"LOGO = {self.get_current_banner()['name'].upper()}")
 
-        project_name = node.data.get("project")
+    def toggle_project_in_gantt(self, project_name: str | None) -> None:
         if not project_name or project_name not in self.projects:
+            self.notify("NO VALID PROJECT", severity="warning")
             return
 
         if project_name in self.selected_projects:
             self.selected_projects.remove(project_name)
-            self.notify(f"GANTT - {project_name}")
+            self.notify(f"REMOVED FROM GANTT: {project_name}")
         else:
             self.selected_projects.add(project_name)
-            self.notify(f"GANTT + {project_name}")
+            self.notify(f"ADDED TO GANTT: {project_name}")
 
         self.refresh_project_tree()
         self.refresh_gantt_view()
+
+    def action_toggle_project_selection(self) -> None:
+        tree = self.query_one("#projects", Tree)
+        node = tree.cursor_node
+
+        if node is None or not isinstance(node.data, dict):
+            self.notify("SELECT A PROJECT OR TASK", severity="warning")
+            return
+
+        project_name = node.data.get("project")
+        self.toggle_project_in_gantt(project_name)
 
     def action_export_projects(self) -> None:
         export_names = get_export_project_names(
@@ -2059,15 +2096,12 @@ class PyGanttApp(App):
 
         try:
             output_path = ensure_ods_path(file_path)
-
-            # Current active theme is passed through here.
             saved_path = export_projects_to_ods(
                 self.projects,
                 export_names,
                 output_path,
                 self.theme_data,
             )
-
             self.notify(f"EXPORTED: {saved_path}")
             auto_open_file(saved_path)
         except Exception as exc:
