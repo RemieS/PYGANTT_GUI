@@ -270,10 +270,11 @@ class Banner(Static):
         subtitle = "    A Python-based terminal Gantt-chart tool, by Remie Stronks"
 
         self.update(
+            f"\n"
             f"[bold {theme['banner']}]{banner_data['art']}[/]\n"
-            f"[italic {theme['text']}]{subtitle}[/]"
+            f"\n"
+            f"[italic {theme['text']}]{subtitle}[/]\n"
         )
-
 
 class ConfirmScreen(ModalScreen[bool]):
     CSS = """
@@ -1211,10 +1212,15 @@ class PyGanttApp(App):
 
     #main {
         height: 1fr;
-        padding: 0 1 1 1;
+        padding: 0 1 1 3;
         background: black;
     }
-
+    
+    #banner {
+        margin: 0 1 1 1;
+        padding: 1 0 1 0;
+    }
+    
     #lower-panels {
         height: 1fr;
         align: left top;
