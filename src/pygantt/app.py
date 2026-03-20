@@ -588,11 +588,7 @@ class Banner(Static):
         subtitle = banner_data.get("subtitle", default_subtitle)
 
         art = banner_data.get("art", "").strip("\n")
-
-        if banner_data.get("kind") == "ascii":
-            art_block = f"[{theme['banner']}]{art}[/]"
-        else:
-            art_block = art
+        art_block = f"[{theme['banner']}]{art}[/]"
 
         self.update(
             "\n"
@@ -1620,7 +1616,7 @@ class PyGanttApp(App):
         ("]", "next_gantt_month", "NEXT VIEW"),
         ("0", "reset_gantt_month", "RESET VIEW"),
         ("p", "cycle_theme", "THEME"),
-        ("l", "cycle_logo", "LOGO / FLAG"),
+        ("l", "cycle_logo", "LOGO"),
         ("f", "attach_file", "ATTACH FILE"),
         ("o", "open_attachment", "OPEN FILE"),
         ("r", "remove_attachment", "REMOVE FILE"),
@@ -1641,9 +1637,7 @@ class PyGanttApp(App):
         self.theme_data = THEMES[self.theme_name]
 
         loaded_banners = load_custom_banners(CUSTOM_BANNERS_FILE)
-        ascii_assets = loaded_banners if loaded_banners else FALLBACK_BANNERS
-        flag_assets = build_flag_assets()
-        self.banners = ascii_assets + flag_assets
+        self.banners = loaded_banners if loaded_banners else FALLBACK_BANNERS
 
         self.banner_index = 0
         for i, banner in enumerate(self.banners):
