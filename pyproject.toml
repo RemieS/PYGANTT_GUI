@@ -6,14 +6,10 @@ build-backend = "setuptools.build_meta"
 name = "pygantt"
 version = "0.1.0"
 description = "Terminal-based Gantt chart tool with ASCII banners"
-authors = [
-    { name = "Remie Stronks" }
-]
+authors = [{ name = "Remie Stronks" }]
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = [
-    "textual",
-]
+dependencies = ["textual"]
 
 [project.scripts]
 pygantt = "pygantt.app:main"
@@ -22,6 +18,7 @@ pygantt = "pygantt.app:main"
 include-package-data = true
 
 [tool.setuptools.packages.find]
+where = ["src"]
 include = ["pygantt*"]
 
 [tool.setuptools.package-data]
