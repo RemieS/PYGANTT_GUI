@@ -584,7 +584,7 @@ class Banner(Static):
         theme = self.app.theme_data
         banner_data = self.app.get_current_banner()
 
-        default_subtitle = "    lA Python-based terminal Gantt-chart tool, by Remie Stronks"
+        default_subtitle = "    A Python-based terminal Gantt-chart tool, by Remie Stronks"
         subtitle = banner_data.get("subtitle", default_subtitle)
 
         art = banner_data.get("art", "").strip("\n")
