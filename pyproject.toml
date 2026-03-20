@@ -16,14 +16,13 @@ dependencies = [
 ]
 
 [project.scripts]
-pygantt = "pygantt:main"
+pygantt = "pygantt.app:main"
 
 [tool.setuptools]
-py-modules = ["pygantt"]
+include-package-data = true
 
+[tool.setuptools.packages.find]
+include = ["pygantt*"]
 
 [tool.setuptools.package-data]
-"" = ["custom_banners.txt"]
-
-[tool.setuptools.exclude-package-data]
-"" = ["__pycache__/*", "*.pyc"]
+pygantt = ["custom_banners.txt"]
