@@ -892,6 +892,7 @@ class PyGanttApp(App):
         min-width: 28;
         height: 1fr;
         margin-right: 1;
+        padding: 0;
     }
 
     #tasks-panel {
@@ -899,12 +900,14 @@ class PyGanttApp(App):
         min-width: 32;
         height: 1fr;
         margin-right: 1;
+        padding: 1;
     }
 
     #timeline-panel {
         width: 1fr;
         min-width: 80;
         height: 1fr;
+        padding: 1;
     }
 
     #projects {
@@ -920,12 +923,6 @@ class PyGanttApp(App):
         border: none;
     }
 
-    #tasks-view {
-        width: 34;
-        height: auto;
-        padding: 1;
-    }
-
     #gantt-timeline-scroll {
         width: 1fr;
         height: 1fr;
@@ -937,7 +934,7 @@ class PyGanttApp(App):
     #gantt-timeline {
         width: auto;
         height: auto;
-        padding: 1;
+        padding: 0;
     }
 
     #bottom-spacer {
